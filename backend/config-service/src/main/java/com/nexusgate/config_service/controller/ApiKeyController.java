@@ -2,7 +2,6 @@ package com.nexusgate.config_service.controller;
 
 import com.nexusgate.config_service.dto.ApiKeyDto;
 import com.nexusgate.config_service.dto.CreateApiKeyRequest;
-import com.nexusgate.config_service.model.ApiKey;
 import com.nexusgate.config_service.service.ApiKeyService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
