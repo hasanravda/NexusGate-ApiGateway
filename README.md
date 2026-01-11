@@ -44,6 +44,14 @@ To verify that all services are running correctly:
 docker-compose ps
 ```
 
+To verify PostgreSQL is working, you can connect to it using psql:
+
+```bash
+docker exec -it nexusgate-postgres psql -U nexusgate -d nexusgate
+```
+
+This will open an interactive PostgreSQL shell where you can execute SQL commands. Type `\q` to exit.
+
 ### Stop Services
 
 To stop all running services:
