@@ -2,6 +2,7 @@ package com.nexusgate.config_service.service;
 
 import com.nexusgate.config_service.dto.ApiKeyDto;
 import com.nexusgate.config_service.dto.CreateApiKeyRequest;
+import com.nexusgate.config_service.exception.ResourceNotFoundException;
 import com.nexusgate.config_service.model.ApiKey;
 import com.nexusgate.config_service.repository.ApiKeyRepository;
 import jakarta.transaction.Transactional;
@@ -11,6 +12,8 @@ import org.springframework.stereotype.Service;
 
 import java.security.SecureRandom;
 import java.util.Base64;
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Slf4j  //Simple Logging Facade for Java
 @Service
@@ -40,6 +43,26 @@ public class ApiKeyService {
         log.info("Created API key: {} for client: {} by user: {}",
                 apiKey.getKeyName(), apiKey.getClientName(), apiKey.getCreatedByUserId());
 
+        return convertToDto(apiKey);
+    }
+
+    public List<ApiKeyDto> getAllApiKeys(){
+        return  apiKeyRepository.findAll()
+                .stream()
+                .map(this::convertToDto)
+                .collect(Collectors.toList());
+    }
+
+    public List<ApiKeyDto> getApiKeysByUserId(Long userId) {
+        return apiKeyRepository.findByCreatedByUserId(userId)  // CHANGED
+                .stream()
+                .map(this::convertToDto)
+                .collect(Collectors.toList());
+    }
+
+    public ApiKeyDto getApiKeyById(Long id) {
+        ApiKey apiKey = apiKeyRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("API key not found with id: " + id));
         return convertToDto(apiKey);
     }
 
