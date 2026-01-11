@@ -1,0 +1,24 @@
+services:
+  postgres:
+    image: postgres:17
+    container_name: nexusgate-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: nexusgate
+      POSTGRES_USER: nexusgate
+      POSTGRES_PASSWORD: nexusgate123
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./db/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    restart: unless-stopped
+
+  redis:
+    image: redis:7
+    container_name: nexusgate-redis
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
