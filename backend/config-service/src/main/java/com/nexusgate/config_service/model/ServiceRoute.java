@@ -56,6 +56,7 @@ public class ServiceRoute {
      * Example: "GET,POST,PUT,DELETE"
      */
     @Column(name = "allowed_methods", length = 100)
+    @Builder.Default
     private String allowedMethods = "GET,POST,PUT,DELETE";
 
     // ============ AUTHENTICATION CONFIG (NEW!) ============
@@ -66,6 +67,7 @@ public class ServiceRoute {
      * false → Publicly accessible, no auth needed
      */
     @Column(name = "auth_required")
+    @Builder.Default
     private Boolean authRequired = true;
 
     /**
@@ -73,6 +75,7 @@ public class ServiceRoute {
      * Options: "API_KEY", "JWT", "BOTH", "NONE"
      */
     @Column(name = "auth_type", length = 20)
+    @Builder.Default
     private String authType = "API_KEY";  // Default to API key
 
     // ============ RATE LIMITING CONFIG ============
@@ -82,17 +85,20 @@ public class ServiceRoute {
      * If false, no rate limits apply (be careful!)
      */
     @Column(name = "rate_limit_enabled")
+    @Builder.Default
     private Boolean rateLimitEnabled = true;
 
     /**
      * Default rate limits for this API
      * These apply if no custom rate limit exists for an API key
      */
-    @Column(name = "default_rate_limit_per_minute")
-    private Integer defaultRateLimitPerMinute = 100;
+    @Column(name = "rate_limit_per_minute")
+    @Builder.Default
+    private Integer rateLimitPerMinute = 100;
 
-    @Column(name = "default_rate_limit_per_hour")
-    private Integer defaultRateLimitPerHour = 5000;
+    @Column(name = "rate_limit_per_hour")
+    @Builder.Default
+    private Integer rateLimitPerHour = 5000;
 
     // ============ TIMEOUT CONFIG ============
 
@@ -101,6 +107,7 @@ public class ServiceRoute {
      * Gateway will wait this long for backend response
      */
     @Column(name = "timeout_ms")
+    @Builder.Default
     private Integer timeoutMs = 30000;  // Default 30 seconds
 
     // ============ CUSTOM HEADERS ============
@@ -115,6 +122,7 @@ public class ServiceRoute {
     // ============ STATUS & METADATA ============
 
     @Column(name = "is_active")
+    @Builder.Default
     private Boolean isActive = true;
 
     @Column(name = "created_by_user_id", nullable = false)

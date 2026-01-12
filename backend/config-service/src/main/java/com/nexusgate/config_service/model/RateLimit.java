@@ -42,8 +42,9 @@ public class RateLimit {
      * Which API key does this rate limit apply to?
      * If NULL → applies to all API keys as DEFAULT for this service route
      */
-    @Column(name = "api_key_id")
-    private Long apiKeyId;
+    
+    @Column(name = "api_key_id", nullable = false, unique = true)
+    private Long apiKeyId;  // Foreign key to api_keys table
 
     /**
      * Which service route does this rate limit apply to?
@@ -53,7 +54,7 @@ public class RateLimit {
     private Long serviceRouteId;
 
     // Rate limits
-    @Column(name = "requests_per_minute")
+    @Column(name = "requests_per_minute", nullable = false)
     private Integer requestsPerMinute;
 
     @Column(name = "requests_per_hour")
