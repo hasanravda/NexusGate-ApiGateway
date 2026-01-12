@@ -45,6 +45,7 @@ public class ApiKey {
 
     // === Status ===
     @Column(name = "is_active")
+    @Builder.Default
     private Boolean isActive = true;
 
     @Column(name = "expires_at")
