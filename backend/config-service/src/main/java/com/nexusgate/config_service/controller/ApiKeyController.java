@@ -43,4 +43,24 @@ public class ApiKeyController {
         ApiKeyDto apiKey = apiKeyService.getApiKeyById(id);
         return ResponseEntity.ok(apiKey);
     }
+
+    @GetMapping("/validate")
+    public ResponseEntity<ApiKeyDto> validateApiKey(@RequestParam String keyValue) {
+        ApiKeyDto apiKey = apiKeyService.validateApiKey(keyValue);
+        return ResponseEntity.ok(apiKey);
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<ApiKeyDto> updateApiKey(
+            @PathVariable Long id,
+            @Valid @RequestBody CreateApiKeyRequest request) {
+        ApiKeyDto apiKey = apiKeyService.updateApiKey(id, request);
+        return ResponseEntity.ok(apiKey);
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> revokeApiKey(@PathVariable Long id) {
+        apiKeyService.revokeApiKey(id);
+        return ResponseEntity.noContent().build();
+    }
 }
