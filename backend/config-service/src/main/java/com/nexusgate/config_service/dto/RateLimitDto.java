@@ -1,22 +1,29 @@
 package com.nexusgate.config_service.dto;
 
-import jakarta.validation.constraints.NotNull;
 import lombok.*;
+import java.time.LocalDateTime;
 
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class RateLimitDto {
+
     private Long id;
 
-    @NotNull(message = "API key ID is required")
-    private Long apiKeyId;  // Always tied to an API key
+    private Long apiKeyId;  // ✅ NULLABLE!
 
-    @NotNull(message = "Requests per minute is required")
+    private Long serviceRouteId;  // ✅ NEW! NULLABLE!
+
     private Integer requestsPerMinute;
-
     private Integer requestsPerHour;
     private Integer requestsPerDay;
+
     private Boolean isActive;
+
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
+
+    private String notes;
 }
+
