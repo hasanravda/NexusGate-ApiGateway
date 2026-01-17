@@ -11,6 +11,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.security.SecureRandom;
+import java.time.LocalDateTime;
 import java.util.Base64;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -66,6 +67,53 @@ public class ApiKeyService {
         return convertToDto(apiKey);
     }
 
+    public ApiKeyDto validateApiKey(String keyValue) {
+        ApiKey apiKey = apiKeyRepository.findByKeyValue(keyValue)
+                .orElseThrow(() -> new ResourceNotFoundException("Invalid API key"));
+
+        if (!apiKey.getIsActive()) {
+            throw new ResourceNotFoundException("API key is inactive");
+        }
+
+        if (apiKey.getExpiresAt() != null && apiKey.getExpiresAt().isBefore(LocalDateTime.now())) {
+            throw new ResourceNotFoundException("API key has expired");
+        }
+
+        // Update last used timestamp
+        apiKey.setLastUsedAt(LocalDateTime.now());
+        apiKeyRepository.save(apiKey);
+
+        return convertToDto(apiKey);
+    }
+
+    @Transactional
+    public void revokeApiKey(Long id) {
+        ApiKey apiKey = apiKeyRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("API key not found with id: " + id));
+
+        apiKey.setIsActive(false);
+        apiKeyRepository.save(apiKey);
+        log.info("Revoked API key: {} for client: {}", apiKey.getKeyName(), apiKey.getClientName());
+    }
+
+    @Transactional
+    public ApiKeyDto updateApiKey(Long id, CreateApiKeyRequest request) {
+        ApiKey apiKey = apiKeyRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("API key not found with id: " + id));
+
+        // Update fields (except keyValue which should never change)
+        apiKey.setKeyName(request.getKeyName());
+        apiKey.setClientName(request.getClientName());
+        apiKey.setClientEmail(request.getClientEmail());
+        apiKey.setClientCompany(request.getClientCompany());
+        apiKey.setExpiresAt(request.getExpiresAt());
+        apiKey.setNotes(request.getNotes());
+
+        apiKey = apiKeyRepository.save(apiKey);
+        log.info("Updated API key: {} for client: {}", apiKey.getKeyName(), apiKey.getClientName());
+
+        return convertToDto(apiKey);
+    }
 
     private String generateSecureKey() {
         SecureRandom random = new SecureRandom();

@@ -64,6 +64,7 @@ public class RateLimit {
     private Integer requestsPerDay;
 
     @Column(name = "is_active")
+    @Builder.Default
     private Boolean isActive = true;
 
     @CreationTimestamp
