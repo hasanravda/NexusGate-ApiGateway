@@ -1,0 +1,148 @@
+{
+  "scenarios": [
+    {
+      "name": "Basic Rate Limit Test",
+      "description": "Tests basic rate limiting with constant rate",
+      "request": {
+        "targetKey": "nx_test_key_123",
+        "targetEndpoint": "http://localhost:8080/api/users",
+        "requestRate": 50,
+        "durationSeconds": 30,
+        "concurrencyLevel": 5,
+        "requestPattern": "CONSTANT_RATE",
+        "httpMethod": "GET"
+      },
+      "expectedOutcome": "Mix of 200 and 429 responses based on rate limit configuration"
+    },
+    {
+      "name": "Burst Load Test",
+      "description": "Tests burst handling with maximum concurrent requests",
+      "request": {
+        "targetKey": "nx_prod_key_456",
+        "targetEndpoint": "http://localhost:8080/api/products",
+        "requestRate": 200,
+        "durationSeconds": 10,
+        "concurrencyLevel": 20,
+        "requestPattern": "BURST",
+        "httpMethod": "GET"
+      },
+      "expectedOutcome": "High rate limit enforcement, tests burst protection"
+    },
+    {
+      "name": "Sustained Load Test",
+      "description": "Long-running test to verify sustained rate limit enforcement",
+      "request": {
+        "targetKey": "nx_test_key_789",
+        "targetEndpoint": "http://localhost:8080/api/orders",
+        "requestRate": 100,
+        "durationSeconds": 300,
+        "concurrencyLevel": 10,
+        "requestPattern": "CONSTANT_RATE",
+        "httpMethod": "GET"
+      },
+      "expectedOutcome": "Consistent rate limiting over extended period"
+    },
+    {
+      "name": "Ramp-Up Test",
+      "description": "Gradually increases load to find breaking point",
+      "request": {
+        "targetKey": "nx_test_key_123",
+        "targetEndpoint": "http://localhost:8080/api/users",
+        "requestRate": 150,
+        "durationSeconds": 60,
+        "concurrencyLevel": 15,
+        "requestPattern": "RAMP_UP",
+        "httpMethod": "GET"
+      },
+      "expectedOutcome": "Progressive rate limiting as load increases"
+    },
+    {
+      "name": "Single Client High Rate",
+      "description": "Tests rate limiting with minimal concurrency",
+      "request": {
+        "targetKey": "nx_test_key_123",
+        "targetEndpoint": "http://localhost:8080/api/users",
+        "requestRate": 50,
+        "durationSeconds": 30,
+        "concurrencyLevel": 1,
+        "requestPattern": "CONSTANT_RATE",
+        "httpMethod": "GET"
+      },
+      "expectedOutcome": "Single-threaded rate limit verification"
+    },
+    {
+      "name": "High Concurrency Low Rate",
+      "description": "Tests many clients with low individual rates",
+      "request": {
+        "targetKey": "nx_test_key_123",
+        "targetEndpoint": "http://localhost:8080/api/users",
+        "requestRate": 50,
+        "durationSeconds": 30,
+        "concurrencyLevel": 25,
+        "requestPattern": "CONSTANT_RATE",
+        "httpMethod": "GET"
+      },
+      "expectedOutcome": "Distributed load from multiple clients"
+    },
+    {
+      "name": "POST Request Test",
+      "description": "Tests rate limiting for POST endpoints",
+      "request": {
+        "targetKey": "nx_test_key_123",
+        "targetEndpoint": "http://localhost:8080/api/users",
+        "requestRate": 30,
+        "durationSeconds": 20,
+        "concurrencyLevel": 3,
+        "requestPattern": "CONSTANT_RATE",
+        "httpMethod": "POST"
+      },
+      "expectedOutcome": "Rate limiting for write operations"
+    },
+    {
+      "name": "Mixed Pattern Test",
+      "description": "Quick burst followed by monitoring",
+      "request": {
+        "targetKey": "nx_test_key_123",
+        "targetEndpoint": "http://localhost:8080/api/products",
+        "requestRate": 500,
+        "durationSeconds": 5,
+        "concurrencyLevel": 50,
+        "requestPattern": "BURST",
+        "httpMethod": "GET"
+      },
+      "expectedOutcome": "Immediate rate limit activation"
+    },
+    {
+      "name": "Low Volume Test",
+      "description": "Tests below rate limit threshold",
+      "request": {
+        "targetKey": "nx_test_key_123",
+        "targetEndpoint": "http://localhost:8080/api/users",
+        "requestRate": 10,
+        "durationSeconds": 60,
+        "concurrencyLevel": 2,
+        "requestPattern": "CONSTANT_RATE",
+        "httpMethod": "GET"
+      },
+      "expectedOutcome": "All requests should succeed (no rate limiting)"
+    },
+    {
+      "name": "Stress Test",
+      "description": "Maximum load to test system limits",
+      "request": {
+        "targetKey": "nx_stress_test",
+        "targetEndpoint": "http://localhost:8080/api/users",
+        "requestRate": 1000,
+        "durationSeconds": 30,
+        "concurrencyLevel": 100,
+        "requestPattern": "BURST",
+        "httpMethod": "GET"
+      },
+      "expectedOutcome": "Heavy rate limiting and potential service degradation"
+    }
+  ],
+  "usage": {
+    "description": "Use these scenarios to test different load patterns",
+    "howToRun": "curl -X POST http://localhost:8083/load-test/start -H 'Content-Type: application/json' -d @scenario.json"
+  }
+}
