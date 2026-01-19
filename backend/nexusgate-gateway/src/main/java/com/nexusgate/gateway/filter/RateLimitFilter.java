@@ -66,8 +66,14 @@ public class RateLimitFilter implements GlobalFilter, Ordered {
     }
 
     private Mono<Void> writeErrorResponse(ServerWebExchange exchange, HttpStatus status, String message) {
+        // Check if response is already committed
+        if (exchange.getResponse().isCommitted()) {
+            log.warn("Response already committed, cannot write error response");
+            return Mono.empty();
+        }
+
+        // Set status code only - do NOT modify headers in WebFlux after response starts
         exchange.getResponse().setStatusCode(status);
-        exchange.getResponse().getHeaders().setContentType(MediaType.APPLICATION_JSON);
 
         Map<String, Object> errorResponse = new HashMap<>();
         errorResponse.put("timestamp", System.currentTimeMillis());

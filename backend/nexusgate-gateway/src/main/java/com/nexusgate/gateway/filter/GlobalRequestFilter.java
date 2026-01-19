@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nexusgate.gateway.client.ServiceRouteClient;
 import com.nexusgate.gateway.dto.ServiceRouteResponse;
 import com.nexusgate.gateway.util.HeaderUtil;
+import com.nexusgate.gateway.util.PathMatcherUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
@@ -35,19 +36,38 @@ public class GlobalRequestFilter implements GlobalFilter, Ordered {
         String method = exchange.getRequest().getMethod().name();
         String clientIp = HeaderUtil.getClientIp(exchange.getRequest());
 
-        log.info("Incoming request: {} {} from {}", method, requestPath, clientIp);
+        log.info("Incoming request path: {} {} from {}", method, requestPath, clientIp);
 
-        return serviceRouteClient.getRouteByPath(requestPath)
-                .flatMap(route -> {
+        // Fetch all active routes and find first matching route using wildcard pattern matching
+        return serviceRouteClient.getAllActiveRoutes()
+                .filter(route -> {
+                    // Check if route is active
                     if (route.getIsActive() == null || !route.getIsActive()) {
-                        return writeErrorResponse(exchange, HttpStatus.NOT_FOUND, "Route not found or inactive");
+                        return false;
                     }
-
+                    // Match using AntPathMatcher for wildcard support
+                    boolean matches = PathMatcherUtil.matches(route.getPublicPath(), requestPath);
+                    if (matches) {
+                        log.debug("Route pattern '{}' matched request path '{}'", route.getPublicPath(), requestPath);
+                    }
+                    return matches;
+                })
+                .next() // Get first matching route
+                .switchIfEmpty(Mono.defer(() -> {
+                    // No route found - write error and return empty to stop processing
+                    log.warn("No matching route found for path: {}", requestPath);
+                    return writeErrorResponse(exchange, HttpStatus.NOT_FOUND, "Service route not found")
+                            .then(Mono.empty());
+                }))
+                .flatMap(route -> {
+                    log.info("Matched route - RouteId: {}, PublicPath: {}, TargetUrl: {}", 
+                            route.getId(), route.getPublicPath(), route.getTargetUrl());
+                    
                     exchange.getAttributes().put("serviceRoute", route);
+                    exchange.getAttributes().put("publicPath", route.getPublicPath());
                     exchange.getAttributes().put("startTime", startTime);
                     return chain.filter(exchange);
                 })
-                .switchIfEmpty(writeErrorResponse(exchange, HttpStatus.NOT_FOUND, "Route not found"))
                 .doFinally(signalType -> {
                     long duration = System.currentTimeMillis() - startTime;
                     ServiceRouteResponse route = exchange.getAttribute("serviceRoute");
@@ -63,8 +83,14 @@ public class GlobalRequestFilter implements GlobalFilter, Ordered {
     }
 
     private Mono<Void> writeErrorResponse(ServerWebExchange exchange, HttpStatus status, String message) {
+        // Check if response is already committed
+        if (exchange.getResponse().isCommitted()) {
+            log.warn("Response already committed, cannot write error response");
+            return Mono.empty();
+        }
+
+        // Set status code only - do NOT modify headers in WebFlux after response starts
         exchange.getResponse().setStatusCode(status);
-        exchange.getResponse().getHeaders().setContentType(MediaType.APPLICATION_JSON);
 
         Map<String, Object> errorResponse = new HashMap<>();
         errorResponse.put("timestamp", System.currentTimeMillis());

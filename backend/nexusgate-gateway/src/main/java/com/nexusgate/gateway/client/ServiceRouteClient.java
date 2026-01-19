@@ -5,7 +5,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
-import reactor.core.publisher.Mono;
+import reactor.core.publisher.Flux;
 
 import java.time.Duration;
 
@@ -16,17 +16,17 @@ public class ServiceRouteClient {
 
     private final WebClient configServiceWebClient;
 
-    public Mono<ServiceRouteResponse> getRouteByPath(String requestPath) {
+    public Flux<ServiceRouteResponse> getAllActiveRoutes() {
         return configServiceWebClient
                 .get()
                 .uri(uriBuilder -> uriBuilder
-                        .path("/service-routes/by-path")
-                        .queryParam("path", requestPath)
+                        .path("/service-routes")
+                        .queryParam("activeOnly", true)
                         .build())
                 .retrieve()
-                .bodyToMono(ServiceRouteResponse.class)
+                .bodyToFlux(ServiceRouteResponse.class)
                 .timeout(Duration.ofSeconds(5))
-                .doOnError(e -> log.error("Failed to get route for path: {}", requestPath, e))
-                .onErrorResume(e -> Mono.empty());
+                .doOnError(e -> log.error("Failed to fetch active routes from config service", e))
+                .onErrorResume(e -> Flux.empty());
     }
 }

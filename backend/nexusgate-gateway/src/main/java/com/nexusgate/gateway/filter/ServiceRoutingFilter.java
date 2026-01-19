@@ -38,8 +38,19 @@ public class ServiceRoutingFilter implements GlobalFilter, Ordered {
         ServerHttpRequest request = exchange.getRequest();
         Long apiKeyId = exchange.getAttribute("apiKeyId");
 
+        // Build headers - copy from request but exclude hop-by-hop headers
         HttpHeaders headers = new HttpHeaders();
-        headers.addAll(request.getHeaders());
+        request.getHeaders().forEach((key, values) -> {
+            // Skip hop-by-hop headers that shouldn't be forwarded
+            String lowerKey = key.toLowerCase();
+            if (!lowerKey.equals("host") && !lowerKey.equals("connection") && 
+                !lowerKey.equals("keep-alive") && !lowerKey.equals("transfer-encoding") &&
+                !lowerKey.equals("te") && !lowerKey.equals("trailer") && 
+                !lowerKey.equals("proxy-authorization") && !lowerKey.equals("proxy-authenticate") &&
+                !lowerKey.equals("upgrade")) {
+                headers.addAll(key, values);
+            }
+        });
 
         if (route.getCustomHeaders() != null && !route.getCustomHeaders().isEmpty()) {
             try {
@@ -59,25 +70,60 @@ public class ServiceRoutingFilter implements GlobalFilter, Ordered {
         headers.add("X-NexusGate-ServiceRoute-Id", String.valueOf(route.getId()));
 
         int timeoutMs = route.getTimeoutMs() != null ? route.getTimeoutMs() : 30000;
+        
+        // Create new WebClient for each request to avoid connection reuse issues
         WebClient client = webClientBuilder
-                .baseUrl(route.getTargetUrl())
-                .defaultHeaders(h -> h.addAll(headers))
                 .build();
 
-        return forwardRequest(client, request, timeoutMs, exchange);
+        return forwardRequest(client, request, timeoutMs, route.getTargetUrl(), headers, exchange);
     }
 
     private Mono<Void> forwardRequest(WebClient client, ServerHttpRequest request,
-                                      int timeoutMs, ServerWebExchange exchange) {
+                                      int timeoutMs, String targetUrl, HttpHeaders headers, 
+                                      ServerWebExchange exchange) {
         HttpMethod method = request.getMethod();
-        String path = request.getPath().value();
+        String fullPath = request.getPath().value();
+        String publicPath = exchange.getAttribute("publicPath");
+        
+        // Extract remaining path after the publicPath pattern
+        String remainingPath = extractRemainingPath(fullPath, publicPath);
+        
+        // If remaining path is just "/" or empty, don't append anything
+        if (remainingPath.isEmpty() || remainingPath.equals("/")) {
+            remainingPath = "";
+        }
+        
+        // Build complete URL
         String query = request.getURI().getRawQuery();
-        String uri = query != null ? path + "?" + query : path;
+        final String completeUrl = query != null 
+            ? targetUrl + remainingPath + "?" + query 
+            : targetUrl + remainingPath;
+        
+        log.info("Forwarding request - FullPath: {}, PublicPath: {}, RemainingPath: '{}', CompleteUrl: {}", 
+                fullPath, publicPath, remainingPath, completeUrl);
 
-        return client.method(method)
-                .uri(uri)
-                .body((outputMessage, context) -> 
-                    outputMessage.writeWith(exchange.getRequest().getBody()))
+        WebClient.RequestBodySpec requestBodySpec = client.method(method)
+                .uri(completeUrl)
+                .headers(h -> h.addAll(headers));
+
+        // Only add body for methods that support request bodies (POST, PUT, PATCH, DELETE)
+        WebClient.RequestHeadersSpec<?> headersSpec;
+        if (method == HttpMethod.POST || method == HttpMethod.PUT || 
+            method == HttpMethod.PATCH || method == HttpMethod.DELETE) {
+            // Use cached body if available to avoid stream consumption issues
+            Object cachedBody = exchange.getAttribute("cachedRequestBodyObject");
+            if (cachedBody != null) {
+                headersSpec = requestBodySpec.bodyValue(cachedBody);
+            } else {
+                headersSpec = requestBodySpec.body((outputMessage, context) -> 
+                    outputMessage.writeWith(exchange.getRequest().getBody()));
+            }
+        } else {
+            // For GET, HEAD, OPTIONS - no body
+            headersSpec = requestBodySpec;
+        }
+
+        return headersSpec
                 .exchangeToMono(clientResponse -> {
                     exchange.getResponse().setStatusCode(clientResponse.statusCode());
                     exchange.getResponse().getHeaders().addAll(clientResponse.headers().asHttpHeaders());
@@ -86,7 +132,14 @@ public class ServiceRoutingFilter implements GlobalFilter, Ordered {
                 })
                 .timeout(Duration.ofMillis(timeoutMs))
                 .onErrorResume(e -> {
-                    log.error("Error forwarding request", e);
+                    log.error("Error forwarding request to {}: {}", completeUrl, e.getMessage(), e);
+                    
+                    // Don't set response if already committed
+                    if (exchange.getResponse().isCommitted()) {
+                        log.warn("Response already committed, cannot set error status");
+                        return Mono.empty();
+                    }
+                    
                     exchange.getResponse().setStatusCode(HttpStatus.BAD_GATEWAY);
                     return exchange.getResponse().setComplete();
                 });
@@ -95,5 +148,41 @@ public class ServiceRoutingFilter implements GlobalFilter, Ordered {
     @Override
     public int getOrder() {
         return -70;
+    }
+
+    /**
+     * Extract the remaining path after the matched publicPath pattern.
+     * For example:
+     *   fullPath: /api/users/123
+     *   publicPath: /api/users/**
+     *   result: /123
+     * 
+     * If fullPath matches basePath exactly, return empty string.
+     * If publicPath ends with /**, remove it and extract the remaining segment.
+     */
+    private String extractRemainingPath(String fullPath, String publicPath) {
+        if (publicPath == null || fullPath == null) {
+            return fullPath;
+        }
+
+        // Remove /** wildcard suffix if present
+        String basePath = publicPath.endsWith("/**") 
+            ? publicPath.substring(0, publicPath.length() - 3)
+            : publicPath;
+
+        // If fullPath equals basePath exactly, no remaining path
+        if (fullPath.equals(basePath)) {
+            return "";
+        }
+
+        // If fullPath starts with basePath, extract the remaining part
+        if (fullPath.startsWith(basePath)) {
+            String remaining = fullPath.substring(basePath.length());
+            // Ensure it starts with / if not empty
+            return remaining.isEmpty() || remaining.startsWith("/") ? remaining : "/" + remaining;
+        }
+
+        // Fallback: return full path
+        return fullPath;
     }
 }

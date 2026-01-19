@@ -80,6 +80,10 @@ public class AuthenticationFilter implements GlobalFilter, Ordered {
                     log.debug("API key validated successfully for keyId: {}", apiKeyResponse.getId());
                     return chain.filter(exchange);
                 })
+                .onErrorResume(throwable -> {
+                    log.error("Error during API key validation", throwable);
+                    return writeErrorResponse(exchange, HttpStatus.UNAUTHORIZED, "API key validation failed");
+                })
                 .switchIfEmpty(writeErrorResponse(exchange, HttpStatus.UNAUTHORIZED, "Invalid API key"));
     }
 
@@ -118,8 +122,14 @@ public class AuthenticationFilter implements GlobalFilter, Ordered {
     }
 
     private Mono<Void> writeErrorResponse(ServerWebExchange exchange, HttpStatus status, String message) {
+        // Check if response is already committed
+        if (exchange.getResponse().isCommitted()) {
+            log.warn("Response already committed, cannot write error response");
+            return Mono.empty();
+        }
+
+        // Set status code only - do NOT modify headers in WebFlux after response starts
         exchange.getResponse().setStatusCode(status);
-        exchange.getResponse().getHeaders().setContentType(MediaType.APPLICATION_JSON);
 
         Map<String, Object> errorResponse = new HashMap<>();
         errorResponse.put("timestamp", System.currentTimeMillis());
