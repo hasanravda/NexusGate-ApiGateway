@@ -35,8 +35,8 @@ public class ServiceRouteService {
                 .publicPath(request.getPublicPath())
                 .targetUrl(request.getTargetUrl())
                 .allowedMethods(
-                    request.getAllowedMethods() != null
-                        ? request.getAllowedMethods()
+                    request.getAllowedMethods() != null && !request.getAllowedMethods().isEmpty()
+                        ? String.join(",", request.getAllowedMethods())
                         : "GET,POST,PUT,DELETE"
                 )
                 .rateLimitPerMinute(
@@ -120,7 +120,11 @@ public class ServiceRouteService {
         existing.setServiceDescription(request.getServiceDescription());
         existing.setPublicPath(request.getPublicPath());
         existing.setTargetUrl(request.getTargetUrl());
-        existing.setAllowedMethods(request.getAllowedMethods());
+        existing.setAllowedMethods(
+            request.getAllowedMethods() != null && !request.getAllowedMethods().isEmpty()
+                ? String.join(",", request.getAllowedMethods())
+                : existing.getAllowedMethods()
+        );
         existing.setRateLimitPerMinute(request.getRateLimitPerMinute());
         existing.setRateLimitPerHour(request.getRateLimitPerHour());
         existing.setNotes(request.getNotes());
@@ -161,7 +165,11 @@ public class ServiceRouteService {
                 .serviceDescription(serviceRoute.getServiceDescription())
                 .publicPath(serviceRoute.getPublicPath())
                 .targetUrl(serviceRoute.getTargetUrl())
-                .allowedMethods(serviceRoute.getAllowedMethods())
+                .allowedMethods(
+                    serviceRoute.getAllowedMethods() != null
+                        ? java.util.Arrays.asList(serviceRoute.getAllowedMethods().split(","))
+                        : java.util.Collections.emptyList()
+                )
                 .rateLimitPerMinute(serviceRoute.getRateLimitPerMinute())
                 .rateLimitPerHour(serviceRoute.getRateLimitPerHour())
                 .isActive(serviceRoute.getIsActive())

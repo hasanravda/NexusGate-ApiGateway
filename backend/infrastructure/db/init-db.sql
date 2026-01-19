@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS service_routes (
     -- Routing config
     public_path VARCHAR(200) NOT NULL UNIQUE,
     target_url VARCHAR(500) NOT NULL,
-    allowed_methods VARCHAR(100) NOT NULL DEFAULT 'GET,POST,PUT,DELETE',
+    allowed_methods TEXT[] NOT NULL DEFAULT ARRAY['GET', 'POST', 'PUT', 'DELETE'],
 
     -- Auth config
     auth_required BOOLEAN NOT NULL DEFAULT TRUE,
@@ -207,16 +207,13 @@ INSERT INTO service_routes (
 )
 VALUES
     ('user-service', 'Handles all user management operations', '/api/users/**', 'http://localhost:8082/users',
-     'GET,POST,PUT,DELETE', true, 'API_KEY', true, 200, 10000, 1, true),
+     ARRAY['GET', 'POST', 'PUT', 'DELETE'], true, 'API_KEY', true, 200, 10000, 1, true),
 
     ('order-service', 'Processes order management', '/api/orders/**', 'http://localhost:8083/orders',
-     'GET,POST,PUT,DELETE', true, 'API_KEY', true, 150, 8000, 1, true),
+     ARRAY['GET', 'POST', 'PUT', 'DELETE'], true, 'API_KEY', true, 150, 8000, 1, true),
 
     ('payment-service', 'Handles payment processing', '/api/payments/**', 'http://localhost:8084/payments',
-     'POST', true, 'API_KEY', true, 50, 2000, 1, true),
-
-    ('public-data-service', 'Public data endpoints', '/api/public/**', 'http://localhost:8085/public',
-     'GET', false, 'NONE', false, 1000, 50000, 1, true)
+     ARRAY['POST'], true, 'API_KEY', true, 50, 2000, 1, true)
     ON CONFLICT (public_path) DO NOTHING;
 
 -- Insert API keys

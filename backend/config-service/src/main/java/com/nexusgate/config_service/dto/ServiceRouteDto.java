@@ -6,6 +6,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 // ========== RESPONSE DTO ==========
 @Data
@@ -19,7 +20,7 @@ public class ServiceRouteDto {
     private String serviceDescription;
     private String publicPath;
     private String targetUrl;
-    private String allowedMethods;
+    private List<String> allowedMethods;
     private Integer rateLimitPerMinute;
     private Integer rateLimitPerHour;
     private Boolean isActive;
