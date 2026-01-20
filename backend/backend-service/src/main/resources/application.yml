@@ -1,0 +1,32 @@
+spring:
+  application:
+    name: backend-service
+
+server:
+  port: 8091
+
+# Actuator Configuration for Prometheus
+management:
+  endpoints:
+    web:
+      exposure:
+        # Expose prometheus, health, and info endpoints
+        include: prometheus,health,info
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    tags:
+      application: ${spring.application.name}
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+
+# Application Info (visible at /actuator/info)
+info:
+  app:
+    name: NexusGate Mock Backend Service
+    description: Mock backend services (user, order, payment) for testing and monitoring
+    version: 1.0.0
