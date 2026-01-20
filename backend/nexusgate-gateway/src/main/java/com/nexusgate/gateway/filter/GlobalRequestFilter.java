@@ -2,8 +2,11 @@ package com.nexusgate.gateway.filter;
 
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.nexusgate.gateway.client.ApiKeyClient;
 import com.nexusgate.gateway.client.ServiceRouteClient;
+import com.nexusgate.gateway.dto.ApiKeyResponse;
 import com.nexusgate.gateway.dto.ServiceRouteResponse;
+import com.nexusgate.gateway.exception.ApiKeyInvalidException;
 import com.nexusgate.gateway.util.HeaderUtil;
 import com.nexusgate.gateway.util.PathMatcherUtil;
 import lombok.RequiredArgsConstructor;
@@ -18,6 +21,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -27,6 +31,7 @@ import java.util.Map;
 public class GlobalRequestFilter implements GlobalFilter, Ordered {
 
     private final ServiceRouteClient serviceRouteClient;
+    private final ApiKeyClient apiKeyClient;
     private final ObjectMapper objectMapper;
 
     @Override
@@ -53,21 +58,63 @@ public class GlobalRequestFilter implements GlobalFilter, Ordered {
                     return matches;
                 })
                 .next() // Get first matching route
-                .switchIfEmpty(Mono.defer(() -> {
-                    // No route found - write error and return empty to stop processing
-                    log.warn("No matching route found for path: {}", requestPath);
-                    return writeErrorResponse(exchange, HttpStatus.NOT_FOUND, "Service route not found")
-                            .then(Mono.empty());
-                }))
                 .flatMap(route -> {
-                    log.info("Matched route - RouteId: {}, PublicPath: {}, TargetUrl: {}", 
+                    log.info("Matched route - RouteId: {}, PublicPath: {}, TargetUrl: {}",
                             route.getId(), route.getPublicPath(), route.getTargetUrl());
-                    
-                    exchange.getAttributes().put("serviceRoute", route);
-                    exchange.getAttributes().put("publicPath", route.getPublicPath());
-                    exchange.getAttributes().put("startTime", startTime);
-                    return chain.filter(exchange);
+
+                    // Extract API key from header
+                    String apiKey = HeaderUtil.extractApiKey(exchange.getRequest());
+
+                    // Validate API key is present and not blank
+                    if (apiKey == null || apiKey.trim().isEmpty()) {
+                        log.warn("API key missing for path: {} - Returning 401 UNAUTHORIZED", requestPath);
+                        return writeErrorResponse(exchange, HttpStatus.UNAUTHORIZED, "API key is missing");
+                    }
+
+                    log.debug("API key found for path: {}, validating with config service...", requestPath);
+
+                    // Validate API key with config service
+                    return apiKeyClient.validateApiKey(apiKey)
+                            .flatMap(apiKeyResponse -> {
+                                // Check if API key is active
+                                if (apiKeyResponse.getIsActive() == null || !apiKeyResponse.getIsActive()) {
+                                    log.warn("API key is inactive for path: {} - Returning 401 UNAUTHORIZED", requestPath);
+                                    return writeErrorResponse(exchange, HttpStatus.UNAUTHORIZED, "API key is inactive");
+                                }
+
+                                // Check if API key is expired
+                                if (apiKeyResponse.getExpiresAt() != null && 
+                                    apiKeyResponse.getExpiresAt().isBefore(LocalDateTime.now())) {
+                                    log.warn("API key is expired for path: {} - Returning 401 UNAUTHORIZED", requestPath);
+                                    return writeErrorResponse(exchange, HttpStatus.UNAUTHORIZED, "API key is expired");
+                                }
+
+                                log.info("API key validation successful - ApiKeyId: {}", apiKeyResponse.getId());
+
+                                // Store validated API key information in exchange attributes
+                                exchange.getAttributes().put("apiKeyId", apiKeyResponse.getId());
+                                exchange.getAttributes().put("apiKeyValue", apiKeyResponse.getKeyValue());
+                                exchange.getAttributes().put("serviceRoute", route);
+                                exchange.getAttributes().put("publicPath", route.getPublicPath());
+                                exchange.getAttributes().put("startTime", startTime);
+                                
+                                return chain.filter(exchange);
+                            })
+                            .onErrorResume(ApiKeyInvalidException.class, e -> {
+                                log.warn("Invalid API key for path: {} - {}", requestPath, e.getMessage());
+                                return writeErrorResponse(exchange, HttpStatus.UNAUTHORIZED, "Invalid API key");
+                            })
+                            .onErrorResume(e -> {
+                                log.error("Config service unavailable for path: {} - {}", requestPath, e.getMessage());
+                                return writeErrorResponse(exchange, HttpStatus.SERVICE_UNAVAILABLE, 
+                                        "Authentication service temporarily unavailable");
+                            });
                 })
+                .switchIfEmpty(Mono.defer(() -> {
+                    // No route found - write error response and stop processing
+                    log.warn("No matching route found for path: {}", requestPath);
+                    return writeErrorResponse(exchange, HttpStatus.NOT_FOUND, "Service route not found");
+                }))
                 .doFinally(signalType -> {
                     long duration = System.currentTimeMillis() - startTime;
                     ServiceRouteResponse route = exchange.getAttribute("serviceRoute");
@@ -86,7 +133,7 @@ public class GlobalRequestFilter implements GlobalFilter, Ordered {
         // Check if response is already committed
         if (exchange.getResponse().isCommitted()) {
             log.warn("Response already committed, cannot write error response");
-            return Mono.empty();
+            return exchange.getResponse().setComplete();
         }
 
         // Set status code only - do NOT modify headers in WebFlux after response starts

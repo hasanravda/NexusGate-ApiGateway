@@ -125,7 +125,7 @@ public class AuthenticationFilter implements GlobalFilter, Ordered {
         // Check if response is already committed
         if (exchange.getResponse().isCommitted()) {
             log.warn("Response already committed, cannot write error response");
-            return Mono.empty();
+            return exchange.getResponse().setComplete();
         }
 
         // Set status code only - do NOT modify headers in WebFlux after response starts

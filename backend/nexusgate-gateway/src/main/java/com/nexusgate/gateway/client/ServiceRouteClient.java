@@ -17,6 +17,7 @@ public class ServiceRouteClient {
     private final WebClient configServiceWebClient;
 
     public Flux<ServiceRouteResponse> getAllActiveRoutes() {
+    // Fetch all active service routes from the configuration service
         return configServiceWebClient
                 .get()
                 .uri(uriBuilder -> uriBuilder

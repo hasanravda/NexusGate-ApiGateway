@@ -137,7 +137,7 @@ public class ServiceRoutingFilter implements GlobalFilter, Ordered {
                     // Don't set response if already committed
                     if (exchange.getResponse().isCommitted()) {
                         log.warn("Response already committed, cannot set error status");
-                        return Mono.empty();
+                        return exchange.getResponse().setComplete();
                     }
                     
                     exchange.getResponse().setStatusCode(HttpStatus.BAD_GATEWAY);
