@@ -82,9 +82,10 @@ X-API-KEY: abc123xyz
 2. Queries config service: `GET http://localhost:8082/service-routes/by-path?path=/api/users`
 3. Gets route config with target URL: `http://user-service:8080`
 4. Validates API key via: `GET http://localhost:8082/api/keys/validate?keyValue=abc123xyz`
-5. Checks rate limits via: `GET http://localhost:8082/rate-limits/check?apiKeyId=123&serviceRouteId=1`
-6. Forwards to: `GET http://user-service:8080/api/users`
-7. Returns response to client
+5. Checks if API key is active and not expired
+6. Checks rate limits via: `GET http://localhost:8082/rate-limits/check?apiKeyId=123&serviceRouteId=1`
+7. Forwards to: `GET http://user-service:8080/api/users`
+8. Returns response to client
 
 ---
 
@@ -253,8 +254,13 @@ GET http://localhost:8082/rate-limits/check?apiKeyId=123&serviceRouteId=1
 │  • Extract request path, method, client IP                       │
 │  • Call Config Service: GET /service-routes/by-path             │
 │  • Validate route is active                                      │
-│  • Store route in exchange attributes                            │
-│  • Log request start                                             │
+│  • Extract API key from X-API-KEY header                         │
+│  • Validate API key via Config Service                           │
+│  • Check API key active status and expiration                    │
+│  • Store route and apiKeyId in exchange attributes               │
+│  • Return 401 if API key missing/invalid/expired/inactive        │
+│  • Return 503 if config service unavailable                      │
+│  • Log request start and validation results                      │
 └─────────────────────┬───────────────────────────────────────────┘
                       │
                       ▼
@@ -307,7 +313,7 @@ GET http://localhost:8082/rate-limits/check?apiKeyId=123&serviceRouteId=1
 
 ## 🔐 Authentication Types
 
-### 1. API Key Authentication
+### 1. API Key Authentication (**Enforced in GlobalRequestFilter**)
 
 **Header:**
 ```
@@ -316,10 +322,43 @@ X-API-KEY: abc123xyz
 
 **Use Case:** External API integrations, service-to-service communication
 
+**Validation Process:**
+1. API key header is **required** for all routes
+2. Gateway calls config service: `GET /api/keys/validate?keyValue={apiKey}`
+3. Validates API key exists in database (404 → 401 Unauthorized)
+4. Checks `isActive` status (false → 401 Unauthorized)
+5. Checks `expiresAt` timestamp (expired → 401 Unauthorized)
+6. Stores `apiKeyId` in exchange attributes for downstream filters
+
+**Error Scenarios:**
+- Missing header → `401 Unauthorized: "API key is missing"`
+- Invalid key (not in DB) → `401 Unauthorized: "Invalid API key"`
+- Inactive key → `401 Unauthorized: "API key is inactive"`
+- Expired key → `401 Unauthorized: "API key is expired"`
+- Config service down → `503 Service Unavailable: "Authentication service temporarily unavailable"`
+
 **Example:**
 ```bash
 curl -X GET http://localhost:8081/api/users \
   -H "X-API-KEY: abc123xyz"
+```
+
+**Response (Success):**
+```json
+{
+  "users": [...]
+}
+```
+
+**Response (No API Key):**
+```json
+{
+  "timestamp": 1768922335130,
+  "status": 401,
+  "error": "Unauthorized",
+  "message": "API key is missing",
+  "path": "/api/users"
+}
 ```
 
 ---
@@ -499,10 +538,21 @@ curl -X POST http://localhost:8081/api/orders \
 
 ## 📝 Error Responses
 
-### 401 Unauthorized
+### 401 Unauthorized - Missing API Key
 ```json
 {
-  "timestamp": 1705659084000,
+  "timestamp": 1768922335130,
+  "status": 401,
+  "error": "Unauthorized",
+  "message": "API key is missing",
+  "path": "/api/users"
+}
+```
+
+### 401 Unauthorized - Invalid API Key
+```json
+{
+  "timestamp": 1768922326031,
   "status": 401,
   "error": "Unauthorized",
   "message": "Invalid API key",
@@ -510,13 +560,35 @@ curl -X POST http://localhost:8081/api/orders \
 }
 ```
 
-### 404 Not Found
+### 401 Unauthorized - Inactive API Key
 ```json
 {
   "timestamp": 1705659084000,
+  "status": 401,
+  "error": "Unauthorized",
+  "message": "API key is inactive",
+  "path": "/api/users"
+}
+```
+
+### 401 Unauthorized - Expired API Key
+```json
+{
+  "timestamp": 1705659084000,
+  "status": 401,
+  "error": "Unauthorized",
+  "message": "API key is expired",
+  "path": "/api/users"
+}
+```
+
+### 404 Not Found
+```json
+{
+  "timestamp": 1768922345178,
   "status": 404,
   "error": "Not Found",
-  "message": "Route not found or inactive",
+  "message": "Service route not found",
   "path": "/api/unknown"
 }
 ```
@@ -539,6 +611,17 @@ curl -X POST http://localhost:8081/api/orders \
   "status": 502,
   "error": "Bad Gateway",
   "message": "Error forwarding request",
+  "path": "/api/users"
+}
+```
+
+### 503 Service Unavailable
+```json
+{
+  "timestamp": 1705659084000,
+  "status": 503,
+  "error": "Service Unavailable",
+  "message": "Authentication service temporarily unavailable",
   "path": "/api/users"
 }
 ```
