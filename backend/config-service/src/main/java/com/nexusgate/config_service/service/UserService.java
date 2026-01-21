@@ -3,7 +3,9 @@ package com.nexusgate.config_service.service;
 import com.nexusgate.config_service.dto.*;
 import com.nexusgate.config_service.model.User;
 import com.nexusgate.config_service.repository.UserRepository;
+import com.nexusgate.config_service.security.JwtUtil;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -15,6 +17,8 @@ import java.util.stream.Collectors;
 public class UserService {
     
     private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
+    private final JwtUtil jwtUtil;
     
     /**
      * Get all users
@@ -26,7 +30,7 @@ public class UserService {
     }
     
     /**
-     * Register a new user (Demo - No actual password hashing)
+     * Register a new user with BCrypt password hashing
      */
     @Transactional
     public UserDto register(RegisterRequest request) {
@@ -35,10 +39,10 @@ public class UserService {
             throw new RuntimeException("Email already exists");
         }
         
-        // Create new user (Demo: storing plain password - NOT RECOMMENDED IN PRODUCTION)
+        // Create new user with hashed password
         User user = User.builder()
                 .email(request.getEmail())
-                .password(request.getPassword())  // Demo: plain text (should be hashed in production)
+                .password(passwordEncoder.encode(request.getPassword()))
                 .fullName(request.getFullName())
                 .role(request.getRole() != null ? request.getRole() : "VIEWER")
                 .isActive(true)
@@ -49,14 +53,14 @@ public class UserService {
     }
     
     /**
-     * Sign in user (Demo - Simple password check)
+     * Sign in user with JWT token generation
      */
     public SignInResponse signIn(SignInRequest request) {
         User user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new RuntimeException("Invalid email or password"));
         
-        // Demo: Simple password check (should use password encoder in production)
-        if (!user.getPassword().equals(request.getPassword())) {
+        // Verify password using BCrypt
+        if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
             throw new RuntimeException("Invalid email or password");
         }
         
@@ -64,11 +68,11 @@ public class UserService {
             throw new RuntimeException("Account is inactive");
         }
         
-        // Demo: Return a simple token (should use JWT in production)
-        String demoToken = "demo_token_" + user.getId() + "_" + System.currentTimeMillis();
+        // Generate JWT token
+        String token = jwtUtil.generateToken(user.getEmail(), user.getId(), user.getRole());
         
         return SignInResponse.builder()
-                .token(demoToken)
+                .token(token)
                 .user(convertToDto(user))
                 .message("Sign in successful")
                 .build();
