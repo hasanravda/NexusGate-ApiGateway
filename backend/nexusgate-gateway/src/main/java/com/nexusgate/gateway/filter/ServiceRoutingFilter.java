@@ -38,7 +38,7 @@ public class ServiceRoutingFilter implements GlobalFilter, Ordered {
         ServerHttpRequest request = exchange.getRequest();
         Long apiKeyId = exchange.getAttribute("apiKeyId");
 
-        // Build headers - copy from request but exclude hop-by-hop headers
+        // Build headers - copy from request but exclude hop-by-hop headers and sensitive headers
         HttpHeaders headers = new HttpHeaders();
         request.getHeaders().forEach((key, values) -> {
             // Skip hop-by-hop headers that shouldn't be forwarded
@@ -47,7 +47,7 @@ public class ServiceRoutingFilter implements GlobalFilter, Ordered {
                 !lowerKey.equals("keep-alive") && !lowerKey.equals("transfer-encoding") &&
                 !lowerKey.equals("te") && !lowerKey.equals("trailer") && 
                 !lowerKey.equals("proxy-authorization") && !lowerKey.equals("proxy-authenticate") &&
-                !lowerKey.equals("upgrade")) {
+                !lowerKey.equals("upgrade") && !lowerKey.equals("x-api-key")) {  // Remove X-API-KEY header
                 headers.addAll(key, values);
             }
         });
@@ -64,10 +64,13 @@ public class ServiceRoutingFilter implements GlobalFilter, Ordered {
             }
         }
 
+        // Inject internal headers for backend services
         if (apiKeyId != null) {
-            headers.add("X-NexusGate-ApiKey-Id", String.valueOf(apiKeyId));
+            headers.add("X-Api-Key-Id", String.valueOf(apiKeyId));
+            log.debug("Injected X-Api-Key-Id: {} for route: {}", apiKeyId, route.getId());
         }
-        headers.add("X-NexusGate-ServiceRoute-Id", String.valueOf(route.getId()));
+        headers.add("X-Route-Id", String.valueOf(route.getId()));
+        log.debug("Injected X-Route-Id: {}", route.getId());
 
         int timeoutMs = route.getTimeoutMs() != null ? route.getTimeoutMs() : 30000;
         
@@ -84,6 +87,9 @@ public class ServiceRoutingFilter implements GlobalFilter, Ordered {
         HttpMethod method = request.getMethod();
         String fullPath = request.getPath().value();
         String publicPath = exchange.getAttribute("publicPath");
+        Long apiKeyId = exchange.getAttribute("apiKeyId");
+        ServiceRouteResponse route = exchange.getAttribute("serviceRoute");
+        long startTime = System.currentTimeMillis();
         
         // Extract remaining path after the publicPath pattern
         String remainingPath = extractRemainingPath(fullPath, publicPath);
@@ -99,8 +105,8 @@ public class ServiceRoutingFilter implements GlobalFilter, Ordered {
             ? targetUrl + remainingPath + "?" + query 
             : targetUrl + remainingPath;
         
-        log.info("Forwarding request - FullPath: {}, PublicPath: {}, RemainingPath: '{}', CompleteUrl: {}", 
-                fullPath, publicPath, remainingPath, completeUrl);
+        log.info("Forwarding request - Method: {}, Path: {}, TargetUrl: {}, RouteId: {}, ApiKeyId: {}", 
+                method, fullPath, completeUrl, route != null ? route.getId() : null, apiKeyId);
 
         WebClient.RequestBodySpec requestBodySpec = client.method(method)
                 .uri(completeUrl)
@@ -125,6 +131,11 @@ public class ServiceRoutingFilter implements GlobalFilter, Ordered {
 
         return headersSpec
                 .exchangeToMono(clientResponse -> {
+                    long duration = System.currentTimeMillis() - startTime;
+                    log.info("Request forwarded successfully - Method: {}, Path: {}, Status: {}, Duration: {}ms, RouteId: {}, ApiKeyId: {}", 
+                            method, fullPath, clientResponse.statusCode(), duration, 
+                            route != null ? route.getId() : null, apiKeyId);
+                    
                     exchange.getResponse().setStatusCode(clientResponse.statusCode());
                     exchange.getResponse().getHeaders().addAll(clientResponse.headers().asHttpHeaders());
                     return exchange.getResponse()
@@ -132,7 +143,10 @@ public class ServiceRoutingFilter implements GlobalFilter, Ordered {
                 })
                 .timeout(Duration.ofMillis(timeoutMs))
                 .onErrorResume(e -> {
-                    log.error("Error forwarding request to {}: {}", completeUrl, e.getMessage(), e);
+                    long duration = System.currentTimeMillis() - startTime;
+                    log.error("Error forwarding request - Method: {}, Path: {}, TargetUrl: {}, Duration: {}ms, RouteId: {}, ApiKeyId: {}, Error: {}", 
+                            method, fullPath, completeUrl, duration, 
+                            route != null ? route.getId() : null, apiKeyId, e.getMessage(), e);
                     
                     // Don't set response if already committed
                     if (exchange.getResponse().isCommitted()) {

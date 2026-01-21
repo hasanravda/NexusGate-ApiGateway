@@ -1,24 +1,19 @@
 package com.nexusgate.gateway.filter;
 
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nexusgate.gateway.client.RateLimitClient;
 import com.nexusgate.gateway.dto.ServiceRouteResponse;
 import com.nexusgate.gateway.redis.RedisRateLimiterService;
+import com.nexusgate.gateway.util.ErrorResponseUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.core.Ordered;
-import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
-
-import java.util.HashMap;
-import java.util.Map;
 
 @Slf4j
 @Component
@@ -27,7 +22,7 @@ public class RateLimitFilter implements GlobalFilter, Ordered {
 
     private final RateLimitClient rateLimitClient;
     private final RedisRateLimiterService redisRateLimiterService;
-    private final ObjectMapper objectMapper;
+    private final ErrorResponseUtil errorResponseUtil;
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
@@ -39,13 +34,16 @@ public class RateLimitFilter implements GlobalFilter, Ordered {
 
         Long apiKeyId = exchange.getAttribute("apiKeyId");
         if (apiKeyId == null) {
-            log.warn("Rate limiting enabled but no API key found");
+            log.warn("Rate limiting enabled but no API key found for route: {}", route.getId());
             return chain.filter(exchange);
         }
+
+        log.debug("Checking rate limits for ApiKeyId: {}, RouteId: {}", apiKeyId, route.getId());
 
         return rateLimitClient.checkRateLimit(apiKeyId, route.getId())
                 .flatMap(rateLimitResponse -> {
                     if (rateLimitResponse.getIsActive() == null || !rateLimitResponse.getIsActive()) {
+                        log.debug("Rate limiting not active for ApiKeyId: {}, RouteId: {}", apiKeyId, route.getId());
                         return chain.filter(exchange);
                     }
 
@@ -56,40 +54,16 @@ public class RateLimitFilter implements GlobalFilter, Ordered {
                             rateLimitResponse.getRequestsPerHour()
                     ).flatMap(allowed -> {
                         if (!allowed) {
-                            return writeErrorResponse(exchange, HttpStatus.TOO_MANY_REQUESTS,
+                            log.warn("Rate limit exceeded - ApiKeyId: {}, RouteId: {}, Path: {}", 
+                                    apiKeyId, route.getId(), exchange.getRequest().getPath().value());
+                            return errorResponseUtil.writeErrorResponse(exchange, HttpStatus.TOO_MANY_REQUESTS,
                                     "Rate limit exceeded");
                         }
+                        log.debug("Rate limit check passed for ApiKeyId: {}, RouteId: {}", apiKeyId, route.getId());
                         return chain.filter(exchange);
                     });
                 })
                 .switchIfEmpty(chain.filter(exchange));
-    }
-
-    private Mono<Void> writeErrorResponse(ServerWebExchange exchange, HttpStatus status, String message) {
-        // Check if response is already committed
-        if (exchange.getResponse().isCommitted()) {
-            log.warn("Response already committed, cannot write error response");
-            return exchange.getResponse().setComplete();
-        }
-
-        // Set status code only - do NOT modify headers in WebFlux after response starts
-        exchange.getResponse().setStatusCode(status);
-
-        Map<String, Object> errorResponse = new HashMap<>();
-        errorResponse.put("timestamp", System.currentTimeMillis());
-        errorResponse.put("status", status.value());
-        errorResponse.put("error", status.getReasonPhrase());
-        errorResponse.put("message", message);
-        errorResponse.put("path", exchange.getRequest().getPath().value());
-
-        try {
-            byte[] bytes = objectMapper.writeValueAsBytes(errorResponse);
-            DataBuffer buffer = exchange.getResponse().bufferFactory().wrap(bytes);
-            return exchange.getResponse().writeWith(Mono.just(buffer));
-        } catch (Exception e) {
-            log.error("Failed to write error response", e);
-            return exchange.getResponse().setComplete();
-        }
     }
 
     @Override

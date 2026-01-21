@@ -1,26 +1,22 @@
 package com.nexusgate.gateway.filter;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nexusgate.gateway.client.ApiKeyClient;
 import com.nexusgate.gateway.dto.ApiKeyResponse;
 import com.nexusgate.gateway.dto.ServiceRouteResponse;
 import com.nexusgate.gateway.security.JwtValidator;
+import com.nexusgate.gateway.util.ErrorResponseUtil;
 import com.nexusgate.gateway.util.HeaderUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.core.Ordered;
-import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
 import java.time.LocalDateTime;
-import java.util.HashMap;
-import java.util.Map;
 
 @Slf4j
 @Component
@@ -29,7 +25,7 @@ public class AuthenticationFilter implements GlobalFilter, Ordered {
 
     private final ApiKeyClient apiKeyClient;
     private final JwtValidator jwtValidator;
-    private final ObjectMapper objectMapper;
+    private final ErrorResponseUtil errorResponseUtil;
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
@@ -65,14 +61,14 @@ public class AuthenticationFilter implements GlobalFilter, Ordered {
 
         if (apiKey == null || apiKey.isEmpty()) {
             log.warn("Missing API key for path: {}", exchange.getRequest().getPath());
-            return writeErrorResponse(exchange, HttpStatus.UNAUTHORIZED, "API key is required");
+            return errorResponseUtil.writeErrorResponse(exchange, HttpStatus.UNAUTHORIZED, "API key is required");
         }
 
         return apiKeyClient.validateApiKey(apiKey)
                 .flatMap(apiKeyResponse -> {
                     if (!isValidApiKey(apiKeyResponse)) {
                         log.warn("Invalid or expired API key");
-                        return writeErrorResponse(exchange, HttpStatus.UNAUTHORIZED, "Invalid or expired API key");
+                        return errorResponseUtil.writeErrorResponse(exchange, HttpStatus.UNAUTHORIZED, "Invalid or expired API key");
                     }
 
                     // Store API key ID for downstream filters
@@ -82,9 +78,9 @@ public class AuthenticationFilter implements GlobalFilter, Ordered {
                 })
                 .onErrorResume(throwable -> {
                     log.error("Error during API key validation", throwable);
-                    return writeErrorResponse(exchange, HttpStatus.UNAUTHORIZED, "API key validation failed");
+                    return errorResponseUtil.writeErrorResponse(exchange, HttpStatus.UNAUTHORIZED, "API key validation failed");
                 })
-                .switchIfEmpty(writeErrorResponse(exchange, HttpStatus.UNAUTHORIZED, "Invalid API key"));
+                .switchIfEmpty(errorResponseUtil.writeErrorResponse(exchange, HttpStatus.UNAUTHORIZED, "Invalid API key"));
     }
 
     private Mono<Void> authenticateWithJwt(ServerWebExchange exchange, GatewayFilterChain chain) {
@@ -92,13 +88,13 @@ public class AuthenticationFilter implements GlobalFilter, Ordered {
 
         if (jwt == null || jwt.isEmpty()) {
             log.warn("Missing JWT token for path: {}", exchange.getRequest().getPath());
-            return writeErrorResponse(exchange, HttpStatus.UNAUTHORIZED, "JWT token is required");
+            return errorResponseUtil.writeErrorResponse(exchange, HttpStatus.UNAUTHORIZED, "JWT token is required");
         }
 
         boolean isValid = jwtValidator.validateToken(jwt);
         if (!isValid) {
             log.warn("Invalid or expired JWT token");
-            return writeErrorResponse(exchange, HttpStatus.UNAUTHORIZED, "Invalid or expired JWT token");
+            return errorResponseUtil.writeErrorResponse(exchange, HttpStatus.UNAUTHORIZED, "Invalid or expired JWT token");
         }
 
         log.debug("JWT validated successfully");
@@ -119,33 +115,6 @@ public class AuthenticationFilter implements GlobalFilter, Ordered {
         }
 
         return true;
-    }
-
-    private Mono<Void> writeErrorResponse(ServerWebExchange exchange, HttpStatus status, String message) {
-        // Check if response is already committed
-        if (exchange.getResponse().isCommitted()) {
-            log.warn("Response already committed, cannot write error response");
-            return exchange.getResponse().setComplete();
-        }
-
-        // Set status code only - do NOT modify headers in WebFlux after response starts
-        exchange.getResponse().setStatusCode(status);
-
-        Map<String, Object> errorResponse = new HashMap<>();
-        errorResponse.put("timestamp", System.currentTimeMillis());
-        errorResponse.put("status", status.value());
-        errorResponse.put("error", status.getReasonPhrase());
-        errorResponse.put("message", message);
-        errorResponse.put("path", exchange.getRequest().getPath().value());
-
-        try {
-            byte[] bytes = objectMapper.writeValueAsBytes(errorResponse);
-            DataBuffer buffer = exchange.getResponse().bufferFactory().wrap(bytes);
-            return exchange.getResponse().writeWith(Mono.just(buffer));
-        } catch (Exception e) {
-            log.error("Failed to write error response", e);
-            return exchange.getResponse().setComplete();
-        }
     }
 
     @Override

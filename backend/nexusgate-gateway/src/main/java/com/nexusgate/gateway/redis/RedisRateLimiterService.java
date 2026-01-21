@@ -17,15 +17,24 @@ public class RedisRateLimiterService {
     private final ReactiveRedisTemplate<String, String> redisTemplate;
 
     public Mono<Boolean> isAllowed(Long apiKeyId, Long serviceRouteId, Integer requestsPerMinute, Integer requestsPerHour) {
-        String minuteKey = String.format("nexusgate:%d:%d:minute", apiKeyId, serviceRouteId);
-        String hourKey = String.format("nexusgate:%d:%d:hour", apiKeyId, serviceRouteId);
+        String minuteKey = String.format("rate:%d:%d:minute", apiKeyId, serviceRouteId);
+        String hourKey = String.format("rate:%d:%d:hour", apiKeyId, serviceRouteId);
+
+        log.debug("Checking rate limits - ApiKeyId: {}, RouteId: {}, PerMinute: {}, PerHour: {}", 
+                apiKeyId, serviceRouteId, requestsPerMinute, requestsPerHour);
 
         return checkAndIncrement(minuteKey, requestsPerMinute, Duration.ofMinutes(1))
                 .flatMap(minuteAllowed -> {
                     if (!minuteAllowed) {
+                        log.warn("Rate limit exceeded for minute - ApiKeyId: {}, RouteId: {}", apiKeyId, serviceRouteId);
                         return Mono.just(false);
                     }
-                    return checkAndIncrement(hourKey, requestsPerHour, Duration.ofHours(1));
+                    return checkAndIncrement(hourKey, requestsPerHour, Duration.ofHours(1))
+                            .doOnNext(hourAllowed -> {
+                                if (!hourAllowed) {
+                                    log.warn("Rate limit exceeded for hour - ApiKeyId: {}, RouteId: {}", apiKeyId, serviceRouteId);
+                                }
+                            });
                 });
     }
 
