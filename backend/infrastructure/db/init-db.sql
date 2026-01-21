@@ -206,7 +206,7 @@ INSERT INTO service_routes (
     created_by_user_id, is_active
 )
 VALUES
-    ('user-service', 'Handles all user management operations', '/api/users/**', 'http://localhost:8082/users',
+    ('user-service', 'Handles all user management operations', '/api/users/**', 'http://localhost:8082/api/users',
      ARRAY['GET', 'POST', 'PUT', 'DELETE'], true, 'API_KEY', true, 200, 10000, 1, true),
 
     ('order-service', 'Processes order management', '/api/orders/**', 'http://localhost:8083/orders',
