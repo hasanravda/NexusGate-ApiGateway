@@ -2,6 +2,7 @@ package com.nexusgate.config_service.service;
 
 import com.nexusgate.config_service.dto.CreateServiceRouteRequest;
 import com.nexusgate.config_service.dto.ServiceRouteDto;
+import com.nexusgate.config_service.dto.UpdateSecurityRequest;
 import com.nexusgate.config_service.exception.ResourceNotFoundException;
 import com.nexusgate.config_service.model.ServiceRoute;
 import com.nexusgate.config_service.repository.ServiceRouteRepository;
@@ -38,6 +39,11 @@ public class ServiceRouteService {
                     request.getAllowedMethods() != null && !request.getAllowedMethods().isEmpty()
                         ? String.join(",", request.getAllowedMethods())
                         : "GET,POST,PUT,DELETE"
+                )
+                .requiresApiKey(
+                    request.getRequiresApiKey() != null
+                        ? request.getRequiresApiKey()
+                        : true  // Default to true for backward compatibility
                 )
                 .rateLimitPerMinute(
                     request.getRateLimitPerMinute() != null
@@ -125,6 +131,9 @@ public class ServiceRouteService {
                 ? String.join(",", request.getAllowedMethods())
                 : existing.getAllowedMethods()
         );
+        if (request.getRequiresApiKey() != null) {
+            existing.setRequiresApiKey(request.getRequiresApiKey());
+        }
         existing.setRateLimitPerMinute(request.getRateLimitPerMinute());
         existing.setRateLimitPerHour(request.getRateLimitPerHour());
         existing.setNotes(request.getNotes());
@@ -142,6 +151,23 @@ public class ServiceRouteService {
                 );
 
         serviceRoute.setIsActive(!serviceRoute.getIsActive());
+        ServiceRoute updated = serviceRouteRepository.save(serviceRoute);
+        return toDto(updated);
+    }
+
+    // Update security settings (requiresApiKey)
+    @Transactional
+    public ServiceRouteDto updateSecurity(Long id, UpdateSecurityRequest request) {
+        ServiceRoute serviceRoute = serviceRouteRepository.findById(id)
+                .orElseThrow(() ->
+                    new ResourceNotFoundException("Service route not found with id: " + id)
+                );
+
+        if (request.getRequiresApiKey() == null) {
+            throw new IllegalArgumentException("requiresApiKey field is required");
+        }
+
+        serviceRoute.setRequiresApiKey(request.getRequiresApiKey());
         ServiceRoute updated = serviceRouteRepository.save(serviceRoute);
         return toDto(updated);
     }
@@ -170,6 +196,7 @@ public class ServiceRouteService {
                         ? java.util.Arrays.asList(serviceRoute.getAllowedMethods().split(","))
                         : java.util.Collections.emptyList()
                 )
+                .requiresApiKey(serviceRoute.getRequiresApiKey())
                 .rateLimitPerMinute(serviceRoute.getRateLimitPerMinute())
                 .rateLimitPerHour(serviceRoute.getRateLimitPerHour())
                 .isActive(serviceRoute.getIsActive())

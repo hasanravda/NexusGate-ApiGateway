@@ -78,6 +78,15 @@ public class ServiceRoute {
     @Builder.Default
     private String authType = "API_KEY";  // Default to API key
 
+    /**
+     * Does this route require an API key?
+     * true → API key validation is enforced (default for backward compatibility)
+     * false → API key validation is skipped (public routes)
+     */
+    @Column(name = "requires_api_key", nullable = false)
+    @Builder.Default
+    private Boolean requiresApiKey = false;
+
     // ============ RATE LIMITING CONFIG ============
 
     /**

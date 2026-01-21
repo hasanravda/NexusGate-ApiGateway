@@ -2,6 +2,7 @@ package com.nexusgate.config_service.controller;
 
 import com.nexusgate.config_service.dto.CreateServiceRouteRequest;
 import com.nexusgate.config_service.dto.ServiceRouteDto;
+import com.nexusgate.config_service.dto.UpdateSecurityRequest;
 import com.nexusgate.config_service.service.ServiceRouteService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -83,6 +84,18 @@ public class ServiceRouteController {
     @PatchMapping("/{id}/toggle")
     public ResponseEntity<ServiceRouteDto> toggleActiveStatus(@PathVariable Long id) {
         ServiceRouteDto updated = serviceRouteService.toggleActiveStatus(id);
+        return ResponseEntity.ok(updated);
+    }
+
+    /**
+     * Update security settings (requiresApiKey)
+     * PATCH /service-routes/{id}/security
+     */
+    @PatchMapping("/{id}/security")
+    public ResponseEntity<ServiceRouteDto> updateSecurity(
+            @PathVariable Long id,
+            @RequestBody UpdateSecurityRequest request) {
+        ServiceRouteDto updated = serviceRouteService.updateSecurity(id, request);
         return ResponseEntity.ok(updated);
     }
 

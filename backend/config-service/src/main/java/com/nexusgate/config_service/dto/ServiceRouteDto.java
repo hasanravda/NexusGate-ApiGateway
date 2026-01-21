@@ -21,6 +21,7 @@ public class ServiceRouteDto {
     private String publicPath;
     private String targetUrl;
     private List<String> allowedMethods;
+    private Boolean requiresApiKey;
     private Integer rateLimitPerMinute;
     private Integer rateLimitPerHour;
     private Boolean isActive;

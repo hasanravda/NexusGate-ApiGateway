@@ -56,8 +56,31 @@ public class GlobalRequestFilter implements GlobalFilter, Ordered {
                 })
                 .next() // Get first matching route
                 .flatMap(route -> {
-                    log.info("Matched route - RouteId: {}, PublicPath: {}, TargetUrl: {}",
-                            route.getId(), route.getPublicPath(), route.getTargetUrl());
+                    log.info("Matched route - RouteId: {}, PublicPath: {}, TargetUrl: {}, RequiresApiKey: {}",
+                            route.getId(), route.getPublicPath(), route.getTargetUrl(), route.getRequiresApiKey());
+
+                    // Check if route requires API key validation
+                    Boolean requiresApiKey = route.getRequiresApiKey();
+                    if (requiresApiKey == null) {
+                        requiresApiKey = true; // Default to true for safety
+                    }
+
+                    // If route doesn't require API key, skip validation and proceed
+                    if (!requiresApiKey) {
+                        log.info("Route does not require API key - RouteId: {}, Path: {} - Skipping API key validation",
+                                route.getId(), requestPath);
+                        
+                        // Store route info but no API key validation
+                        exchange.getAttributes().put("serviceRoute", route);
+                        exchange.getAttributes().put("publicPath", route.getPublicPath());
+                        exchange.getAttributes().put("startTime", startTime);
+                        
+                        return chain.filter(exchange);
+                    }
+
+                    // Route requires API key - validate it
+                    log.debug("Route requires API key - RouteId: {}, Path: {} - Validating API key",
+                            route.getId(), requestPath);
 
                     // Extract API key from header
                     String apiKey = HeaderUtil.extractApiKey(exchange.getRequest());

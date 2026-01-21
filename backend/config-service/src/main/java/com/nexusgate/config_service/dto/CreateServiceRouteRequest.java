@@ -19,6 +19,7 @@ public class CreateServiceRouteRequest {
     private String publicPath;           // Required: "/api/users/**"
     private String targetUrl;            // Required: "http://user-service:8081"
     private List<String> allowedMethods; // Optional: ["GET","POST","PUT","DELETE"]
+    private Boolean requiresApiKey;      // Optional: defaults to true
     private Integer rateLimitPerMinute;  // Optional: defaults to 100
     private Integer rateLimitPerHour;    // Optional: defaults to 5000
     private Long createdByUserId;        // Required

@@ -16,6 +16,7 @@ public class ServiceRouteResponse {
     private List<String> allowedMethods;
     private Boolean authRequired;
     private String authType;
+    private Boolean requiresApiKey;
     private Boolean rateLimitEnabled;
     private Integer rateLimitPerMinute;
     private Integer rateLimitPerHour;
