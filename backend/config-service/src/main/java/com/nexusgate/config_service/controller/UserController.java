@@ -11,6 +11,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/users")
@@ -55,13 +56,26 @@ public class UserController {
     public ResponseEntity<UserDto> getCurrentUser() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         
-        if (authentication == null || !authentication.isAuthenticated()) {
+        if (authentication == null || !authentication.isAuthenticated() 
+            || "anonymousUser".equals(authentication.getPrincipal())) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
         
         String email = authentication.getName();
         UserDto user = userService.getCurrentUser(email);
         return ResponseEntity.ok(user);
+    }
+    
+    /**
+     * POST /api/users/logout - Logout user
+     * JWT is stateless, so client should delete the token
+     */
+    @PostMapping("/logout")
+    public ResponseEntity<Map<String, String>> logout() {
+        return ResponseEntity.ok(Map.of(
+            "message", "Logged out successfully",
+            "instruction", "Please delete the JWT token from client storage"
+        ));
     }
     
     /**
