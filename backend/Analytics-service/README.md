@@ -238,10 +238,10 @@ cd backend/Analytics-service
 java -jar target/Analytics-service-0.0.1-SNAPSHOT.jar
 ```
 
-### Using Docker (via infrastructure)
+### Using Docker
 
 ```bash
-cd backend/infrastructure
+cd backend
 docker-compose up analytics-service
 ```
 

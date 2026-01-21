@@ -215,7 +215,7 @@ CREATE TABLE metrics_summary (
 
 1. **Start PostgreSQL** (via Docker Compose):
    ```bash
-   cd backend/infrastructure
+   cd backend
    docker-compose up postgres
    ```
 

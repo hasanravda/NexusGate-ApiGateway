@@ -276,7 +276,7 @@ exchange.getAttributes().put("rateLimited", false);
 
 ```bash
 # Terminal 1: PostgreSQL
-cd backend/infrastructure
+cd backend
 docker-compose up postgres
 
 # Terminal 2: Analytics Service
@@ -339,7 +339,7 @@ SELECT * FROM request_logs ORDER BY timestamp DESC LIMIT 10;
 
 ## Docker Compose Integration
 
-Add Analytics Service to `backend/infrastructure/docker-compose.yml`:
+Add Analytics Service to `backend/docker-compose.yml`:
 
 ```yaml
 services:

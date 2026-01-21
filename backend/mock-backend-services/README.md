@@ -251,10 +251,9 @@ curl http://localhost:8091/users
 Before testing, ensure service routes in database point to backend-service:
 ```bash
 # Execute the SQL update script
-docker exec -i <postgres-container> psql -U nexusgate -d nexusgate_db < infrastructure/db/update-service-routes.sql
+docker exec -i <postgres-container> psql -U nexusgate -d nexusgate_db < db/update-service-routes.sql
 
 # Or manually via docker-compose
-cd infrastructure
 docker-compose exec postgres psql -U nexusgate -d nexusgate_db -f /docker-entrypoint-initdb.d/update-service-routes.sql
 ```
 

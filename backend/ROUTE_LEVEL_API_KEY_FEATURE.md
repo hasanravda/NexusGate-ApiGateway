@@ -201,7 +201,7 @@ curl -X PATCH http://localhost:8082/service-routes/1/security \
 
 1. **Run Database Migration:**
    ```bash
-   psql -U nexusgate -d nexusgate_db -f infrastructure/db/add-requires-api-key.sql
+   psql -U nexusgate -d nexusgate_db -f db/add-requires-api-key.sql
    ```
 
 2. **Deploy Config-Service:**
