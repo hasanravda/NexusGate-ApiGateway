@@ -37,6 +37,7 @@ CREATE TABLE IF NOT EXISTS service_routes (
     -- Auth config
     auth_required BOOLEAN NOT NULL DEFAULT TRUE,
     auth_type VARCHAR(20) NOT NULL DEFAULT 'API_KEY',
+    requires_api_key BOOLEAN NOT NULL DEFAULT TRUE,
 
     -- Rate limit config
     rate_limit_enabled BOOLEAN NOT NULL DEFAULT TRUE,
