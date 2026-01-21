@@ -40,8 +40,9 @@ public class ErrorResponseUtil {
             return exchange.getResponse().setComplete();
         }
 
-        // Set status code only - do NOT modify headers in WebFlux after response starts
+        // Set status code and Content-Type header
         exchange.getResponse().setStatusCode(status);
+        exchange.getResponse().getHeaders().add("Content-Type", "application/json");
 
         Map<String, Object> errorResponse = new HashMap<>();
         errorResponse.put("timestamp", System.currentTimeMillis());
