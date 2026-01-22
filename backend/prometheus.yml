@@ -1,0 +1,52 @@
+# Prometheus Configuration for NexusGate Analytics Service
+
+global:
+  scrape_interval: 15s      # How often to scrape targets
+  evaluation_interval: 15s  # How often to evaluate rules
+  
+  external_labels:
+    cluster: 'nexusgate'
+    environment: 'development'
+
+# Scrape configurations
+scrape_configs:
+  # Analytics Service metrics
+  - job_name: 'analytics-service'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['host.docker.internal:8085']
+        labels:
+          service: 'analytics'
+          application: 'nexusgate'
+    
+    # Optional: Add basic health check
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        
+  # Config Service metrics (if needed later)
+  - job_name: 'config-service'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['host.docker.internal:8082']
+        labels:
+          service: 'config'
+          application: 'nexusgate'
+    
+  # Gateway Service metrics (if needed later)
+  - job_name: 'gateway-service'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['host.docker.internal:8081']
+        labels:
+          service: 'gateway'
+          application: 'nexusgate'
+
+  # Mock Backend Service metrics (if needed later)
+  - job_name: 'mock-backend'
+    metrics_path: '/actuator/health'
+    static_configs:
+      - targets: ['host.docker.internal:8091']
+        labels:
+          service: 'mock-backend'
+          application: 'nexusgate'
