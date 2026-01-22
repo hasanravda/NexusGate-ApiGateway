@@ -1,8 +1,8 @@
 package com.nexusgate.Analytics_service.controller;
 
 import com.nexusgate.Analytics_service.dto.AnalyticsOverview;
+import com.nexusgate.Analytics_service.dto.RecentRequestDto;
 import com.nexusgate.Analytics_service.dto.TopEndpoint;
-import com.nexusgate.Analytics_service.model.RequestLog;
 import com.nexusgate.Analytics_service.service.AnalyticsService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -42,17 +42,20 @@ public class AnalyticsController {
      * GET /analytics/recent-requests
      * 
      * Get recent requests with pagination
+     * - Backend-enforced max 20 records per page
+     * - Always sorted by timestamp DESC (newest first)
+     * - Enhanced with apiKeyName and serviceName (optional fields)
      * 
      * @param page Page number (default: 0)
-     * @param size Page size (default: 20)
+     * @param size Page size (default: 20, max: 20)
      */
     @GetMapping("/recent-requests")
-    public ResponseEntity<Page<RequestLog>> getRecentRequests(
+    public ResponseEntity<Page<RecentRequestDto>> getRecentRequests(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size
     ) {
         log.debug("Fetching recent requests: page={}, size={}", page, size);
-        Page<RequestLog> logs = analyticsService.getRecentRequests(page, size);
+        Page<RecentRequestDto> logs = analyticsService.getRecentRequests(page, size);
         return ResponseEntity.ok(logs);
     }
 
