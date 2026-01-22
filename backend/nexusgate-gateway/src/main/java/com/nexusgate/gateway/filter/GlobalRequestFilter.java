@@ -7,6 +7,8 @@ import com.nexusgate.gateway.client.ServiceRouteClient;
 import com.nexusgate.gateway.dto.ApiKeyResponse;
 import com.nexusgate.gateway.dto.ServiceRouteResponse;
 import com.nexusgate.gateway.exception.ApiKeyInvalidException;
+import com.nexusgate.gateway.service.ApiKeyCacheService;
+import com.nexusgate.gateway.service.RouteCacheService;
 import com.nexusgate.gateway.util.ErrorResponseUtil;
 import com.nexusgate.gateway.util.HeaderUtil;
 import com.nexusgate.gateway.util.PathMatcherUtil;
@@ -27,8 +29,8 @@ import java.time.LocalDateTime;
 @RequiredArgsConstructor
 public class GlobalRequestFilter implements GlobalFilter, Ordered {
 
-    private final ServiceRouteClient serviceRouteClient;
-    private final ApiKeyClient apiKeyClient;
+    private final RouteCacheService routeCacheService;
+    private final ApiKeyCacheService apiKeyCacheService;
     private final ErrorResponseUtil errorResponseUtil;
 
     @Override
@@ -40,8 +42,8 @@ public class GlobalRequestFilter implements GlobalFilter, Ordered {
 
         log.info("Incoming request path: {} {} from {}", method, requestPath, clientIp);
 
-        // Fetch all active routes and find first matching route using wildcard pattern matching
-        return serviceRouteClient.getAllActiveRoutes()
+        // Use cached routes instead of calling config-service on every request
+        return routeCacheService.getCachedRoutes()
                 .filter(route -> {
                     // Check if route is active
                     if (route.getIsActive() == null || !route.getIsActive()) {
@@ -91,10 +93,10 @@ public class GlobalRequestFilter implements GlobalFilter, Ordered {
                         return errorResponseUtil.writeErrorResponse(exchange, HttpStatus.UNAUTHORIZED, "API key is missing");
                     }
 
-                    log.debug("API key found for path: {}, validating with config service...", requestPath);
+                    log.debug("API key found for path: {}, validating from cache...", requestPath);
 
-                    // Validate API key with config service
-                    return apiKeyClient.validateApiKey(apiKey)
+                    // Validate API key from cache (instant lookup, zero network calls!)
+                    return apiKeyCacheService.validateApiKey(apiKey)
                             .flatMap(apiKeyResponse -> {
                                 // Check if API key is active
                                 if (apiKeyResponse.getIsActive() == null || !apiKeyResponse.getIsActive()) {

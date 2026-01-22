@@ -8,6 +8,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.time.Duration;
@@ -52,6 +53,24 @@ public class ApiKeyClient {
                     }
                     log.error("Failed to validate API key with config service: {}", e.getMessage());
                     return Mono.error(new RuntimeException("Config service unavailable: " + e.getMessage()));
+                });
+    }
+
+    /**
+     * Get all API keys from config service (for caching purposes)
+     */
+    public Flux<ApiKeyResponse> getAllApiKeys() {
+        return configServiceWebClient
+                .get()
+                .uri("/api/keys")
+                .retrieve()
+                .bodyToFlux(ApiKeyResponse.class)
+                .timeout(Duration.ofSeconds(10))
+                .doOnNext(apiKey -> log.debug("Fetched API key from config service: id={}", apiKey.getId()))
+                .doOnError(e -> log.error("Failed to fetch all API keys from config service: {}", e.getMessage()))
+                .onErrorResume(e -> {
+                    log.warn("Config service unavailable for fetching API keys. Returning empty list.");
+                    return Flux.empty();
                 });
     }
 }
