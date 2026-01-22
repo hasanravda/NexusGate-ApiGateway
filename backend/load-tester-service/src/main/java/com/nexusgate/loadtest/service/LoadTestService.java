@@ -259,6 +259,21 @@ public class LoadTestService {
     }
 
     /**
+     * Retrieves all test executions (running and completed).
+     */
+    public java.util.List<LoadTestResult> getAllTests() {
+        return testExecutions.values().stream()
+                .map(execution -> {
+                    if (execution.getStatus() == LoadTestStatus.RUNNING) {
+                        return reportGenerator.generatePartialReport(execution);
+                    } else {
+                        return reportGenerator.generateReport(execution);
+                    }
+                })
+                .collect(java.util.stream.Collectors.toList());
+    }
+
+    /**
      * Stops a running test gracefully.
      */
     public void stopTest(String testId) {
