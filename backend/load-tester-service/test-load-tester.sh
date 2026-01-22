@@ -4,7 +4,7 @@
 # This script demonstrates how to use the load testing service
 
 BASE_URL="http://localhost:8083"
-TARGET_ENDPOINT="http://localhost:8080/api/users"
+TARGET_ENDPOINT="http://localhost:8081/api/users"
 API_KEY="nx_test_key_123"
 
 echo "=========================================="

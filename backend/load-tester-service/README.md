@@ -54,7 +54,7 @@ Content-Type: application/json
 
 {
   "targetKey": "nx_lendingkart_prod_abc123",
-  "targetEndpoint": "http://localhost:8080/api/users",
+  "targetEndpoint": "http://localhost:8081/api/users",
   "requestRate": 100,
   "durationSeconds": 30,
   "concurrencyLevel": 10,
@@ -125,7 +125,7 @@ GET /load-test/results/{testId}
   "requestsPerSecond": 100.0,
   "successRate": 80.0,
   "rateLimitRate": 20.0,
-  "targetEndpoint": "http://localhost:8080/api/users",
+  "targetEndpoint": "http://localhost:8081/api/users",
   "configuredRequestRate": 100,
   "concurrencyLevel": 10
 }
@@ -268,7 +268,7 @@ curl -X POST http://localhost:8083/load-test/start \
   -H "Content-Type: application/json" \
   -d '{
     "targetKey": "nx_test_key_123",
-    "targetEndpoint": "http://localhost:8080/api/users",
+    "targetEndpoint": "http://localhost:8081/api/users",
     "requestRate": 50,
     "durationSeconds": 60,
     "concurrencyLevel": 5,
@@ -285,7 +285,7 @@ curl -X POST http://localhost:8083/load-test/start \
   -H "Content-Type: application/json" \
   -d '{
     "targetKey": "nx_test_key_123",
-    "targetEndpoint": "http://localhost:8080/api/products",
+    "targetEndpoint": "http://localhost:8081/api/products",
     "requestRate": 200,
     "durationSeconds": 10,
     "concurrencyLevel": 20,

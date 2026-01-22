@@ -19,7 +19,7 @@
       "description": "Tests burst handling with maximum concurrent requests",
       "request": {
         "targetKey": "nx_prod_key_456",
-        "targetEndpoint": "http://localhost:8080/api/products",
+        "targetEndpoint": "http://localhost:8081/api/products",
         "requestRate": 200,
         "durationSeconds": 10,
         "concurrencyLevel": 20,
@@ -33,7 +33,7 @@
       "description": "Long-running test to verify sustained rate limit enforcement",
       "request": {
         "targetKey": "nx_test_key_789",
-        "targetEndpoint": "http://localhost:8080/api/orders",
+        "targetEndpoint": "http://localhost:8081/api/orders",
         "requestRate": 100,
         "durationSeconds": 300,
         "concurrencyLevel": 10,
@@ -47,7 +47,7 @@
       "description": "Gradually increases load to find breaking point",
       "request": {
         "targetKey": "nx_test_key_123",
-        "targetEndpoint": "http://localhost:8080/api/users",
+        "targetEndpoint": "http://localhost:8081/api/users",
         "requestRate": 150,
         "durationSeconds": 60,
         "concurrencyLevel": 15,
@@ -61,7 +61,7 @@
       "description": "Tests rate limiting with minimal concurrency",
       "request": {
         "targetKey": "nx_test_key_123",
-        "targetEndpoint": "http://localhost:8080/api/users",
+        "targetEndpoint": "http://localhost:8081/api/users",
         "requestRate": 50,
         "durationSeconds": 30,
         "concurrencyLevel": 1,
@@ -75,7 +75,7 @@
       "description": "Tests many clients with low individual rates",
       "request": {
         "targetKey": "nx_test_key_123",
-        "targetEndpoint": "http://localhost:8080/api/users",
+        "targetEndpoint": "http://localhost:8081/api/users",
         "requestRate": 50,
         "durationSeconds": 30,
         "concurrencyLevel": 25,
@@ -89,7 +89,7 @@
       "description": "Tests rate limiting for POST endpoints",
       "request": {
         "targetKey": "nx_test_key_123",
-        "targetEndpoint": "http://localhost:8080/api/users",
+        "targetEndpoint": "http://localhost:8081/api/users",
         "requestRate": 30,
         "durationSeconds": 20,
         "concurrencyLevel": 3,
@@ -103,7 +103,7 @@
       "description": "Quick burst followed by monitoring",
       "request": {
         "targetKey": "nx_test_key_123",
-        "targetEndpoint": "http://localhost:8080/api/products",
+        "targetEndpoint": "http://localhost:8081/api/products",
         "requestRate": 500,
         "durationSeconds": 5,
         "concurrencyLevel": 50,
@@ -117,7 +117,7 @@
       "description": "Tests below rate limit threshold",
       "request": {
         "targetKey": "nx_test_key_123",
-        "targetEndpoint": "http://localhost:8080/api/users",
+        "targetEndpoint": "http://localhost:8081/api/users",
         "requestRate": 10,
         "durationSeconds": 60,
         "concurrencyLevel": 2,
@@ -131,7 +131,7 @@
       "description": "Maximum load to test system limits",
       "request": {
         "targetKey": "nx_stress_test",
-        "targetEndpoint": "http://localhost:8080/api/users",
+        "targetEndpoint": "http://localhost:8081/api/users",
         "requestRate": 1000,
         "durationSeconds": 30,
         "concurrencyLevel": 100,

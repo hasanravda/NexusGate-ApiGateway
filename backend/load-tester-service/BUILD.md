@@ -47,7 +47,7 @@ curl -X POST http://localhost:8083/load-test/start \
   -H "Content-Type: application/json" \
   -d '{
     "targetKey": "nx_test_key_123",
-    "targetEndpoint": "http://localhost:8080/api/users",
+    "targetEndpoint": "http://localhost:8081/api/users",
     "requestRate": 50,
     "durationSeconds": 30,
     "concurrencyLevel": 5,
@@ -291,7 +291,7 @@ ExecutorService executor = new ThreadPoolExecutor(
    ```
 
 2. **Integrate with API Gateway**
-   - Ensure target service is running on port 8080
+   - Ensure target service is running on port 8081
    - Configure valid API keys
    - Run load tests to validate rate limiting
 

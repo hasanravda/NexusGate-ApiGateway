@@ -38,7 +38,7 @@ public class LoadTestController {
      * Example request:
      * {
      *   "targetKey": "nx_lendingkart_prod_abc123",
-     *   "targetEndpoint": "http://localhost:8080/api/users",
+     *   "targetEndpoint": "http://localhost:8081/api/users",
      *   "requestRate": 100,
      *   "durationSeconds": 30,
      *   "concurrencyLevel": 10,
