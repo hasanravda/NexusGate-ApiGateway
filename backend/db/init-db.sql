@@ -199,22 +199,22 @@ VALUES
     ('viewer@demo.com', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', 'Viewer User', 'VIEWER', true)
     ON CONFLICT (email) DO NOTHING;
 
--- Insert service routes (NEW!)
+-- Insert service routes (with requires_api_key column added per migration)
 INSERT INTO service_routes (
     service_name, service_description, public_path, target_url,
-    allowed_methods, auth_required, auth_type, rate_limit_enabled,
+    allowed_methods, auth_required, auth_type, requires_api_key, rate_limit_enabled,
     rate_limit_per_minute, rate_limit_per_hour,
     created_by_user_id, is_active
 )
 VALUES
-    ('user-service', 'Handles all user management operations', '/api/users/**', 'http://localhost:8082/api/users',
-     ARRAY['GET', 'POST', 'PUT', 'DELETE'], true, 'API_KEY', true, 200, 10000, 1, true),
+    ('user-service', 'Handles all user management operations', '/api/users/**', 'http://localhost:8091/users',
+     ARRAY['GET', 'POST', 'PUT', 'DELETE'], true, 'API_KEY', true, true, 200, 10000, 1, true),
 
-    ('order-service', 'Processes order management', '/api/orders/**', 'http://localhost:8083/orders',
-     ARRAY['GET', 'POST', 'PUT', 'DELETE'], true, 'API_KEY', true, 150, 8000, 1, true),
+    ('order-service', 'Processes order management', '/api/orders/**', 'http://localhost:8091/orders',
+     ARRAY['GET', 'POST', 'PUT', 'DELETE'], true, 'API_KEY', true, true, 150, 8000, 1, true),
 
-    ('payment-service', 'Handles payment processing', '/api/payments/**', 'http://localhost:8084/payments',
-     ARRAY['POST'], true, 'API_KEY', true, 50, 2000, 1, true)
+    ('payment-service', 'Handles payment processing', '/api/payments/**', 'http://localhost:8091/payments',
+     ARRAY['POST'], true, 'API_KEY', true, true, 50, 2000, 1, true)
     ON CONFLICT (public_path) DO NOTHING;
 
 -- Insert API keys
