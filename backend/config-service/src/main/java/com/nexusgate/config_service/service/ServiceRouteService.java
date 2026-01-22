@@ -10,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -37,8 +38,8 @@ public class ServiceRouteService {
                 .targetUrl(request.getTargetUrl())
                 .allowedMethods(
                     request.getAllowedMethods() != null && !request.getAllowedMethods().isEmpty()
-                        ? String.join(",", request.getAllowedMethods())
-                        : "GET,POST,PUT,DELETE"
+                        ? "{" + String.join(",", request.getAllowedMethods()) + "}"
+                        : "{GET,POST,PUT,DELETE}"
                 )
                 .requiresApiKey(
                     request.getRequiresApiKey() != null
@@ -128,7 +129,7 @@ public class ServiceRouteService {
         existing.setTargetUrl(request.getTargetUrl());
         existing.setAllowedMethods(
             request.getAllowedMethods() != null && !request.getAllowedMethods().isEmpty()
-                ? String.join(",", request.getAllowedMethods())
+                ? "{" + String.join(",", request.getAllowedMethods()) + "}"
                 : existing.getAllowedMethods()
         );
         if (request.getRequiresApiKey() != null) {
@@ -193,7 +194,7 @@ public class ServiceRouteService {
                 .targetUrl(serviceRoute.getTargetUrl())
                 .allowedMethods(
                     serviceRoute.getAllowedMethods() != null
-                        ? java.util.Arrays.asList(serviceRoute.getAllowedMethods().split(","))
+                        ? Arrays.asList(serviceRoute.getAllowedMethods().replaceAll("[{}]", "").split(","))
                         : java.util.Collections.emptyList()
                 )
                 .requiresApiKey(serviceRoute.getRequiresApiKey())

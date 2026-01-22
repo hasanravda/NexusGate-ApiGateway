@@ -44,13 +44,23 @@ public class MethodValidationFilter implements GlobalFilter, Ordered {
         String methodName = requestMethod.name();
         List<String> allowedMethods = route.getAllowedMethods();
 
+        // Debug: Log the exact comparison
+        log.debug("Validating method '{}' against allowed methods: {}", methodName, allowedMethods);
+        if (allowedMethods != null) {
+            allowedMethods.forEach(method -> 
+                log.debug("  Comparing '{}' with '{}' (equals: {}, equalsIgnoreCase: {})", 
+                    methodName, method, methodName.equals(method), methodName.equalsIgnoreCase(method))
+            );
+        }
+
         // Check if the request method is in the allowed list (case-insensitive)
-        boolean isAllowed = allowedMethods.stream()
-                .anyMatch(allowed -> allowed.equalsIgnoreCase(methodName));
+        boolean isAllowed = allowedMethods != null && allowedMethods.stream()
+                .anyMatch(allowed -> allowed != null && allowed.equalsIgnoreCase(methodName));
 
         if (!isAllowed) {
-            log.warn("Method {} not allowed for route {} (path: {}). Allowed methods: {}", 
-                    methodName, route.getId(), route.getPublicPath(), allowedMethods);
+            log.warn("Method {} not allowed for route {} (path: {}). Allowed methods: {} (null check: {}, stream check: {})", 
+                    methodName, route.getId(), route.getPublicPath(), allowedMethods,
+                    allowedMethods == null, allowedMethods != null ? allowedMethods.stream().anyMatch(m -> m != null && m.equalsIgnoreCase(methodName)) : "list was null");
             return errorResponseUtil.writeErrorResponse(
                     exchange, 
                     HttpStatus.METHOD_NOT_ALLOWED, 

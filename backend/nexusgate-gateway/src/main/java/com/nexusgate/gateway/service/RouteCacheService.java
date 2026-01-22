@@ -3,6 +3,7 @@ package com.nexusgate.gateway.service;
 import com.nexusgate.gateway.client.ServiceRouteClient;
 import com.nexusgate.gateway.dto.ServiceRouteResponse;
 import jakarta.annotation.PostConstruct;
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -99,6 +100,7 @@ public class RouteCacheService {
         );
     }
 
+    @Getter
     public static class CacheStats {
         private final boolean initialized;
         private final int routeCount;
@@ -112,9 +114,5 @@ public class RouteCacheService {
             this.timeSinceLastRefresh = timeSinceLastRefresh;
         }
 
-        public boolean isInitialized() { return initialized; }
-        public int getRouteCount() { return routeCount; }
-        public long getLastRefreshTime() { return lastRefreshTime; }
-        public long getTimeSinceLastRefresh() { return timeSinceLastRefresh; }
     }
 }

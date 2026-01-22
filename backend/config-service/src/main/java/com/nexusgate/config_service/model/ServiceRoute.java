@@ -6,6 +6,8 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
+import java.util.Arrays;
+import java.util.List;
 
 /**
  * ServiceRoute - YOUR backend APIs that you're exposing through the gateway
@@ -52,12 +54,12 @@ public class ServiceRoute {
     private String targetUrl;
 
     /**
-     * Allowed HTTP methods (comma-separated)
-     * Example: "GET,POST,PUT,DELETE"
+     * Allowed HTTP methods as PostgreSQL array
+     * Stored as TEXT[] in format: {GET,POST,PUT,DELETE}
      */
-    @Column(name = "allowed_methods", length = 100)
+    @Column(name = "allowed_methods")
     @Builder.Default
-    private String allowedMethods = "GET,POST,PUT,DELETE";
+    private String allowedMethods = "{GET,POST,PUT,DELETE}";
 
     // ============ AUTHENTICATION CONFIG (NEW!) ============
 
