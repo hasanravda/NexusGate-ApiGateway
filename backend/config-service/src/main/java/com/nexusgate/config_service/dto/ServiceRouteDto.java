@@ -22,6 +22,7 @@ public class ServiceRouteDto {
     private String targetUrl;
     private List<String> allowedMethods;
     private Boolean requiresApiKey;
+    private Boolean rateLimitEnabled;  // Added - critical for gateway rate limiting!
     private Integer rateLimitPerMinute;
     private Integer rateLimitPerHour;
     private Boolean isActive;

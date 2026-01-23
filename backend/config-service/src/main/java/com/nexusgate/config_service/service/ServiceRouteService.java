@@ -198,6 +198,7 @@ public class ServiceRouteService {
                         : java.util.Collections.emptyList()
                 )
                 .requiresApiKey(serviceRoute.getRequiresApiKey())
+                .rateLimitEnabled(serviceRoute.getRateLimitEnabled())  // CRITICAL FIX: Added to enable gateway rate limiting
                 .rateLimitPerMinute(serviceRoute.getRateLimitPerMinute())
                 .rateLimitPerHour(serviceRoute.getRateLimitPerHour())
                 .isActive(serviceRoute.getIsActive())

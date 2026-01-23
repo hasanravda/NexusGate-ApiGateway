@@ -1,0 +1,1 @@
+{"rateLimitViolations":[],"rateLimitedRequests":0,"testPassed":true,"unauthorizedRequests":0,"failureReason":null,"totalRequests":20,"requestsPerSecond":952.3809523809524,"errorRequests":0,"message":"Rate limit test completed successfully","durationMs":21,"successfulRequests":20}
