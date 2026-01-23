@@ -40,9 +40,9 @@ public class ApiKeyCacheService {
     }
 
     /**
-     * Refresh cache every 60 seconds
+     * Refresh cache every 10 minutes
      */
-    @Scheduled(fixedDelay = 60000)
+    @Scheduled(fixedDelay = 600000)
     public void refreshCache() {
         log.debug("Refreshing API key cache...");
         

@@ -41,9 +41,9 @@ public class RouteCacheService {
     }
 
     /**
-     * Refresh routes every 30 seconds
+     * Refresh routes every 5 minutes
      */
-    @Scheduled(fixedDelay = 30000, initialDelay = 5000)
+    @Scheduled(fixedDelay = 300000, initialDelay = 5000)
     public void refreshRoutes() {
         log.debug("Refreshing route cache...");
         
