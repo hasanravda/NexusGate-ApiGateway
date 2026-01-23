@@ -1,0 +1,1 @@
+{"rateLimitViolations":[],"rateLimitedRequests":0,"testPassed":false,"unauthorizedRequests":0,"failureReason":"FAIL: No successful requests (expected at least some to succeed). ","totalRequests":8,"requestsPerSecond":421.05263157894734,"errorRequests":8,"message":"Rate limit test failed validation","durationMs":19,"successfulRequests":0}
