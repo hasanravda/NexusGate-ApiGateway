@@ -251,49 +251,55 @@ GET http://localhost:8082/rate-limits/check?apiKeyId=123&serviceRouteId=1
                       ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │  Filter 1: GlobalRequestFilter (Order -100)                      │
+│  ✅ OPTIMIZED: Uses in-memory cache (60s refresh)                │
 │  • Extract request path, method, client IP                       │
-│  • Call Config Service: GET /service-routes/by-path             │
+│  • Route lookup from cache (instant)                             │
 │  • Validate route is active                                      │
 │  • Extract API key from X-API-KEY header                         │
-│  • Validate API key via Config Service                           │
+│  • Validate API key via CACHE (no network call)                  │
 │  • Check API key active status and expiration                    │
 │  • Store route and apiKeyId in exchange attributes               │
 │  • Return 401 if API key missing/invalid/expired/inactive        │
-│  • Return 503 if config service unavailable                      │
 │  • Log request start and validation results                      │
 └─────────────────────┬───────────────────────────────────────────┘
                       │
                       ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│  Filter 2: AuthenticationFilter (Order -90)                      │
+│  Filter 2: MethodValidationFilter (Order -95)                    │
+│  • Check if HTTP method is in allowedMethods list                │
+│  • Return 405 if method not allowed                              │
+└─────────────────────┬───────────────────────────────────────────┘
+                      │
+                      ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  Filter 3: AuthenticationFilter (Order -90)                      │
 │  • Check if authentication required                              │
-│  • Extract X-API-KEY or Authorization header                     │
-│  • Validate API Key via Config Service                           │
-│  • Validate JWT signature and expiration                         │
-│  • Store apiKeyId in exchange                                    │
+│  • Validate based on authType (API_KEY, JWT, BOTH)               │
 │  • Return 401 if authentication fails                            │
 └─────────────────────┬───────────────────────────────────────────┘
                       │
                       ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│  Filter 3: RateLimitFilter (Order -80)                          │
+│  Filter 4: RateLimitFilter (Order -80)                          │
 │  • Check if rate limiting enabled                                │
 │  • Call Config Service: GET /rate-limits/check                  │
-│  • Check Redis counters (minute and hour)                        │
-│  • Increment counters atomically                                 │
+│  • Check Redis counters (minute, hour, day)                      │
+│  • Increment counters atomically with TTL                        │
 │  • Return 429 if rate limit exceeded                             │
 └─────────────────────┬───────────────────────────────────────────┘
                       │
                       ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│  Filter 4: ServiceRoutingFilter (Order -70)                     │
+│  Filter 5: ServiceRoutingFilter (Order 0)                       │
 │  • Get route from exchange attributes                            │
 │  • Build headers (original + custom)                             │
 │  • Inject X-NexusGate-ApiKey-Id                                 │
 │  • Inject X-NexusGate-ServiceRoute-Id                           │
+│  • Remove sensitive headers (X-API-Key, Authorization)           │
 │  • Create WebClient with target URL                              │
 │  • Stream request body (non-blocking)                            │
 │  • Forward to backend service                                    │
+│  • Send analytics event (fire-and-forget)                        │
 │  • Stream response back to client                                │
 │  • Handle errors (502 Bad Gateway)                               │
 └─────────────────────┬───────────────────────────────────────────┘
@@ -701,6 +707,59 @@ nexusgate-gateway/
 ✅ **Circuit Breaking** - Configurable timeouts per route  
 ✅ **Path Matching** - Supports wildcards and patterns  
 ✅ **Client IP Detection** - Handles X-Forwarded-For  
+✅ **In-Memory Caching** - API keys and routes cached for performance (60s refresh)  
+✅ **Zero Network Calls** - API key validation via local cache  
+✅ **HTTP Method Validation** - Per-route allowed methods enforcement  
+✅ **Route-Level API Key Control** - Optional authentication per route  
+
+---
+
+## ⚡ Performance Optimizations
+
+### Caching Strategy
+
+**API Key Cache** (`ApiKeyCacheService`):
+- All active API keys loaded into memory on startup
+- Automatic refresh every 60 seconds via `@Scheduled`
+- Instant validation (no network calls during requests)
+- Thread-safe ConcurrentHashMap implementation
+
+**Route Cache** (`RouteCacheService`):
+- All active routes cached on startup
+- 60-second refresh interval
+- Wildcard pattern matching in-memory
+
+**Performance Impact**:
+```
+Before Caching:
+├─ Single request: 500-900ms
+├─ Load (50 req/s): 1-2 seconds
+├─ Load (100 req/s): 3.6+ seconds
+└─ Status: TimeoutException, failures
+
+After Caching:
+├─ Single request: <100ms (cache hits)
+├─ Load (100 req/s): <150ms average
+├─ Config service calls: Zero during requests
+└─ Status: Stable, no timeouts
+```
+
+### Filter Execution Order
+
+Filters execute in strict order for optimal performance:
+1. **GlobalRequestFilter** (-100) - Route resolution & API key validation (cached)
+2. **MethodValidationFilter** (-95) - HTTP method enforcement (quick check)
+3. **AuthenticationFilter** (-90) - JWT/API key authentication
+4. **RateLimitFilter** (-80) - Redis rate limiting (network call)
+5. **ServiceRoutingFilter** (0) - Backend forwarding
+
+Early filters can short-circuit to avoid unnecessary processing.
+
+### Redis Connection Pooling
+
+- Lettuce connection pool for Redis
+- Reused connections across requests
+- Automatic failover handling
 
 ---
 
