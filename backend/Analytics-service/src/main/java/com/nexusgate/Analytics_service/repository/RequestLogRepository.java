@@ -11,6 +11,12 @@ import org.springframework.stereotype.Repository;
 import java.time.Instant;
 import java.util.List;
 
+/**
+ * RequestLogRepository
+ * 
+ * Data access for request logs
+ * Provides queries for analytics and dashboard
+ */
 @Repository
 public interface RequestLogRepository extends JpaRepository<RequestLog, Long> {
 
@@ -58,4 +64,42 @@ public interface RequestLogRepository extends JpaRepository<RequestLog, Long> {
            "GROUP BY r.path, r.serviceRouteId " +
            "ORDER BY requestCount DESC")
     List<Object[]> findTopEndpointsBetween(@Param("start") Instant start, @Param("end") Instant end, Pageable pageable);
+
+    /**
+     * Count blocked requests (authentication/authorization failures)
+     * Dashboard requirement: blocked requests count
+     */
+    @Query("SELECT COUNT(r) FROM RequestLog r WHERE r.blocked = true")
+    Long countBlockedRequests();
+
+    /**
+     * Count blocked requests in time range
+     */
+    @Query("SELECT COUNT(r) FROM RequestLog r WHERE r.blocked = true AND r.timestamp BETWEEN :start AND :end")
+    Long countBlockedRequestsBetween(@Param("start") Instant start, @Param("end") Instant end);
+
+    /**
+     * Calculate average latency for last 24 hours
+     * Dashboard requirement: average response time
+     */
+    @Query("SELECT COALESCE(AVG(r.latencyMs), 0.0) FROM RequestLog r WHERE r.timestamp >= :since")
+    Double averageLatencyLast24Hours(@Param("since") Instant since);
+
+    /**
+     * Count requests by date (for specific day)
+     * Dashboard requirement: daily request counts
+     */
+    @Query("SELECT COUNT(r) FROM RequestLog r WHERE r.timestamp BETWEEN :start AND :end")
+    Long countRequestsByDate(@Param("start") Instant start, @Param("end") Instant end);
+
+    /**
+     * Find blocked requests with pagination
+     */
+    Page<RequestLog> findByBlockedTrueOrderByTimestampDesc(Pageable pageable);
+
+    /**
+     * Find rate-limited requests with pagination
+     */
+    Page<RequestLog> findByRateLimitedTrueOrderByTimestampDesc(Pageable pageable);
 }
+
