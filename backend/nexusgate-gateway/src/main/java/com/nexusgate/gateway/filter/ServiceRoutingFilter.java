@@ -137,7 +137,18 @@ public class ServiceRoutingFilter implements GlobalFilter, Ordered {
                             route != null ? route.getId() : null, apiKeyId);
                     
                     exchange.getResponse().setStatusCode(clientResponse.statusCode());
-                    exchange.getResponse().getHeaders().addAll(clientResponse.headers().asHttpHeaders());
+                    
+                    // Copy headers from backend response (avoiding ReadOnlyHttpHeaders issue)
+                    clientResponse.headers().asHttpHeaders().forEach((key, values) -> {
+                        // Skip certain headers that should not be forwarded
+                        if (!key.equalsIgnoreCase("Transfer-Encoding") && 
+                            !key.equalsIgnoreCase("Connection") &&
+                            !key.equalsIgnoreCase("Keep-Alive")) {
+                            // Add each value individually to avoid ReadOnlyHttpHeaders issues
+                            values.forEach(value -> exchange.getResponse().getHeaders().add(key, value));
+                        }
+                    });
+                    
                     return exchange.getResponse()
                             .writeWith(clientResponse.bodyToFlux(org.springframework.core.io.buffer.DataBuffer.class));
                 })
