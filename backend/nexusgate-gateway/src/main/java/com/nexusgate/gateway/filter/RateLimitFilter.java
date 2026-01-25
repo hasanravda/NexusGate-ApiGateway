@@ -1,10 +1,12 @@
 package com.nexusgate.gateway.filter;
 
 
+import com.nexusgate.gateway.client.AnalyticsClient;
 import com.nexusgate.gateway.client.RateLimitClient;
 import com.nexusgate.gateway.dto.ServiceRouteResponse;
 import com.nexusgate.gateway.redis.RedisRateLimiterService;
 import com.nexusgate.gateway.util.ErrorResponseUtil;
+import com.nexusgate.gateway.util.HeaderUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
@@ -23,6 +25,7 @@ public class RateLimitFilter implements GlobalFilter, Ordered {
     private final RateLimitClient rateLimitClient;
     private final RedisRateLimiterService redisRateLimiterService;
     private final ErrorResponseUtil errorResponseUtil;
+    private final AnalyticsClient analyticsClient;
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
@@ -56,6 +59,31 @@ public class RateLimitFilter implements GlobalFilter, Ordered {
                         if (!allowed) {
                             log.warn("Rate limit exceeded - ApiKeyId: {}, RouteId: {}, Path: {}", 
                                     apiKeyId, route.getId(), exchange.getRequest().getPath().value());
+                            
+                            // Mark as rate limited for analytics
+                            exchange.getAttributes().put("rateLimited", true);
+                            
+                            // Send rate limit violation to Analytics Service
+                            try {
+                                String apiKeyValue = exchange.getAttribute("apiKeyValue");
+                                String clientIp = HeaderUtil.getClientIp(exchange.getRequest());
+                                String limitValue = String.format("%d/min, %d/hour", 
+                                        rateLimitResponse.getRequestsPerMinute(),
+                                        rateLimitResponse.getRequestsPerHour());
+                                
+                                analyticsClient.sendRateLimitViolation(
+                                        apiKeyValue != null ? apiKeyValue : "unknown",
+                                        route.getPublicPath(), // Use publicPath as service identifier
+                                        exchange.getRequest().getPath().value(),
+                                        exchange.getRequest().getMethod().name(),
+                                        limitValue,
+                                        0L, // actual value not tracked in this implementation
+                                        clientIp
+                                );
+                            } catch (Exception e) {
+                                log.warn("Failed to send rate limit violation: {}", e.getMessage());
+                            }
+                            
                             return errorResponseUtil.writeErrorResponse(exchange, HttpStatus.TOO_MANY_REQUESTS,
                                     "Rate limit exceeded");
                         }

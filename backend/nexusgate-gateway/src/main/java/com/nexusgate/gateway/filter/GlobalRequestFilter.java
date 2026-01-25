@@ -2,6 +2,7 @@ package com.nexusgate.gateway.filter;
 
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.nexusgate.gateway.client.AnalyticsClient;
 import com.nexusgate.gateway.client.ApiKeyClient;
 import com.nexusgate.gateway.client.ServiceRouteClient;
 import com.nexusgate.gateway.dto.ApiKeyResponse;
@@ -32,6 +33,7 @@ public class GlobalRequestFilter implements GlobalFilter, Ordered {
     private final RouteCacheService routeCacheService;
     private final ApiKeyCacheService apiKeyCacheService;
     private final ErrorResponseUtil errorResponseUtil;
+    private final AnalyticsClient analyticsClient;
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
@@ -90,6 +92,7 @@ public class GlobalRequestFilter implements GlobalFilter, Ordered {
                     // Validate API key is present and not blank
                     if (apiKey == null || apiKey.trim().isEmpty()) {
                         log.warn("API key missing for path: {} - Returning 401 UNAUTHORIZED", requestPath);
+                        exchange.getAttributes().put("blocked", true);
                         return errorResponseUtil.writeErrorResponse(exchange, HttpStatus.UNAUTHORIZED, "API key is missing");
                     }
 
@@ -101,6 +104,7 @@ public class GlobalRequestFilter implements GlobalFilter, Ordered {
                                 // Check if API key is active
                                 if (apiKeyResponse.getIsActive() == null || !apiKeyResponse.getIsActive()) {
                                     log.warn("API key is inactive for path: {} - Returning 401 UNAUTHORIZED", requestPath);
+                                    exchange.getAttributes().put("blocked", true);
                                     return errorResponseUtil.writeErrorResponse(exchange, HttpStatus.UNAUTHORIZED, "API key is inactive");
                                 }
 
@@ -108,6 +112,7 @@ public class GlobalRequestFilter implements GlobalFilter, Ordered {
                                 if (apiKeyResponse.getExpiresAt() != null && 
                                     apiKeyResponse.getExpiresAt().isBefore(LocalDateTime.now())) {
                                     log.warn("API key is expired for path: {} - Returning 401 UNAUTHORIZED", requestPath);
+                                    exchange.getAttributes().put("blocked", true);
                                     return errorResponseUtil.writeErrorResponse(exchange, HttpStatus.UNAUTHORIZED, "API key is expired");
                                 }
 
@@ -124,6 +129,7 @@ public class GlobalRequestFilter implements GlobalFilter, Ordered {
                             })
                             .onErrorResume(ApiKeyInvalidException.class, e -> {
                                 log.warn("Invalid API key for path: {} - {}", requestPath, e.getMessage());
+                                exchange.getAttributes().put("blocked", true);
                                 return errorResponseUtil.writeErrorResponse(exchange, HttpStatus.UNAUTHORIZED, "Invalid API key");
                             })
                             .onErrorResume(e -> {
@@ -141,13 +147,34 @@ public class GlobalRequestFilter implements GlobalFilter, Ordered {
                     long duration = System.currentTimeMillis() - startTime;
                     ServiceRouteResponse route = exchange.getAttribute("serviceRoute");
                     Long apiKeyId = exchange.getAttribute("apiKeyId");
+                    Boolean rateLimited = exchange.getAttribute("rateLimited");
+                    Boolean blocked = exchange.getAttribute("blocked");
+                    Integer statusCode = exchange.getResponse().getStatusCode() != null ? 
+                            exchange.getResponse().getStatusCode().value() : 500;
 
                     log.info("Request completed: {} {} - Status: {} - Duration: {}ms - ApiKeyId: {} - RouteId: {}",
                             method, requestPath,
-                            exchange.getResponse().getStatusCode(),
+                            statusCode,
                             duration,
                             apiKeyId,
                             route != null ? route.getId() : null);
+
+                    // Send analytics log to Analytics Service (fire-and-forget)
+                    try {
+                        analyticsClient.sendRequestLog(
+                                apiKeyId,
+                                route != null ? route.getId() : null,
+                                method,
+                                requestPath,
+                                statusCode,
+                                duration,
+                                clientIp,
+                                rateLimited != null ? rateLimited : false,
+                                blocked != null ? blocked : (statusCode == 401 || statusCode == 403)
+                        );
+                    } catch (Exception e) {
+                        log.warn("Failed to send analytics log: {}", e.getMessage());
+                    }
                 });
     }
 
