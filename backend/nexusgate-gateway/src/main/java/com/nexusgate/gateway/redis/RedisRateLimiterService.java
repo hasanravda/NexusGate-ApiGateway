@@ -80,9 +80,11 @@ public class RedisRateLimiterService {
         double refillRate = (double) capacity / refillIntervalSeconds; // tokens per second
 
         return redisTemplate.opsForHash().get(bucketKey, "tokens")
+                .map(obj -> obj != null ? obj.toString() : "0")
                 .defaultIfEmpty("0")
                 .zipWith(
                     redisTemplate.opsForHash().get(bucketKey, "last_refill")
+                        .map(obj -> obj != null ? obj.toString() : String.valueOf(currentTimeSeconds))
                         .defaultIfEmpty(String.valueOf(currentTimeSeconds))
                 )
                 .flatMap(tuple -> {
