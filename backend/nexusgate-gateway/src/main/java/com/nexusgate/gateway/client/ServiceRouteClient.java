@@ -5,11 +5,14 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientRequestException;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 import reactor.core.publisher.Flux;
 import reactor.util.retry.Retry;
 
+import java.net.ConnectException;
 import java.time.Duration;
+import java.util.concurrent.TimeoutException;
 
 @Slf4j
 @Component
@@ -21,6 +24,7 @@ public class ServiceRouteClient {
     /**
      * Fetch all active service routes from the configuration service.
      * Implements retry logic, timeout, and comprehensive error handling.
+     * Returns empty list if config service is unavailable (graceful degradation).
      */
     public Flux<ServiceRouteResponse> getAllActiveRoutes() {
         return configServiceWebClient
@@ -31,33 +35,38 @@ public class ServiceRouteClient {
                         .build())
                 .retrieve()
                 .bodyToFlux(ServiceRouteResponse.class)
-                .timeout(Duration.ofSeconds(10)) // Increased timeout to 10 seconds
+                .timeout(Duration.ofSeconds(5))
                 .retryWhen(Retry.backoff(2, Duration.ofMillis(500))
                         .maxBackoff(Duration.ofSeconds(2))
                         .filter(throwable -> !(throwable instanceof WebClientResponseException.NotFound))
                         .doBeforeRetry(retrySignal -> 
-                            log.warn("Retrying config service call, attempt: {}", retrySignal.totalRetries() + 1)))
+                            log.debug("Retrying config service call, attempt: {}", retrySignal.totalRetries() + 1)))
                 .doOnError(WebClientResponseException.class, e -> {
-                    log.error("Config service returned error status: {} - {}", 
+                    log.debug("Config service returned error status: {} - {}", 
                             e.getStatusCode(), e.getResponseBodyAsString());
                 })
-                .doOnError(java.util.concurrent.TimeoutException.class, e -> {
-                    log.error("Timeout calling config service after 10 seconds. Config service may be slow or down.");
+                .doOnError(TimeoutException.class, e -> {
+                    log.debug("Config service request timeout (may be starting up or slow)");
                 })
-                .doOnError(java.net.ConnectException.class, e -> {
-                    log.error("Cannot connect to config service. Service may be down or unreachable.");
+                .doOnError(WebClientRequestException.class, e -> {
+                    if (e.getCause() instanceof ConnectException) {
+                        log.debug("Config service not reachable (connection refused)");
+                    } else {
+                        log.debug("Config service request error: {}", e.getMessage());
+                    }
                 })
                 .doOnError(e -> {
+                    // Log unexpected errors at debug level to avoid noise
                     if (!(e instanceof WebClientResponseException) && 
-                        !(e instanceof java.util.concurrent.TimeoutException) &&
-                        !(e instanceof java.net.ConnectException)) {
-                        log.error("Unexpected error fetching routes from config service: {}", e.getMessage(), e);
+                        !(e instanceof TimeoutException) &&
+                        !(e instanceof WebClientRequestException)) {
+                        log.debug("Error fetching routes: {} - {}", e.getClass().getSimpleName(), e.getMessage());
                     }
                 })
                 .onErrorResume(e -> {
-                    log.warn("Falling back to empty route list due to error. Gateway will return 404 for all requests.");
-                    return Flux.empty(); // Return empty list on any error
+                    // Graceful degradation - return empty route list
+                    // This allows gateway to start without config service
+                    return Flux.empty();
                 });
     }
 }
-

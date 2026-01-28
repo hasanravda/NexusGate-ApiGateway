@@ -41,9 +41,9 @@ public class RouteCacheService {
     }
 
     /**
-     * Refresh routes every 5 seconds
+     * Refresh routes every 30 seconds (reduced noise)
      */
-    @Scheduled(fixedDelay = 5000, initialDelay = 5000)
+    @Scheduled(fixedDelay = 30000, initialDelay = 5000)
     public void refreshRoutes() {
         log.debug("Refreshing route cache...");
         
@@ -51,25 +51,31 @@ public class RouteCacheService {
                 .collectList()
                 .subscribe(
                         routes -> {
+                            boolean wasEmpty = cachedRoutes.isEmpty();
                             cachedRoutes.clear();
                             cachedRoutes.addAll(routes);
                             cacheInitialized = true;
                             lastSuccessfulRefresh = System.currentTimeMillis();
-                            log.info("Route cache refreshed successfully. Loaded {} active routes", routes.size());
                             
-                            // Log route details for debugging
-                            routes.forEach(route -> 
-                                log.debug("Cached route: id={}, publicPath={}, targetUrl={}, requiresApiKey={}", 
-                                    route.getId(), route.getPublicPath(), route.getTargetUrl(), route.getRequiresApiKey())
-                            );
+                            if (routes.isEmpty() && !wasEmpty) {
+                                log.warn("Route cache cleared - no active routes available");
+                            } else if (routes.isEmpty()) {
+                                log.debug("Route cache refresh: 0 routes (config service may be unavailable)");
+                            } else {
+                                log.info("✓ Route cache refreshed: {} active routes loaded", routes.size());
+                                // Log route details for debugging
+                                routes.forEach(route -> 
+                                    log.debug("  → Route: {} → {}", route.getPublicPath(), route.getTargetUrl())
+                                );
+                            }
                         },
                         error -> {
-                            log.error("Failed to refresh route cache: {}", error.getMessage());
                             if (!cacheInitialized) {
-                                log.warn("Cache not initialized and refresh failed. Using empty route list.");
-                                cachedRoutes.clear(); // Clear to ensure we don't use stale data
+                                log.debug("Initial cache load failed (config service unavailable)");
+                                cachedRoutes.clear();
+                                cacheInitialized = true; // Mark as initialized even if empty
                             } else {
-                                log.info("Keeping existing cached routes ({} routes) due to refresh failure", cachedRoutes.size());
+                                log.debug("Cache refresh failed, keeping {} existing routes", cachedRoutes.size());
                             }
                         }
                 );
