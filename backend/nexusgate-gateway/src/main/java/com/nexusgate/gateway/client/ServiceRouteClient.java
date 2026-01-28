@@ -38,34 +38,36 @@ public class ServiceRouteClient {
                 .timeout(Duration.ofSeconds(5))
                 .retryWhen(Retry.backoff(2, Duration.ofMillis(500))
                         .maxBackoff(Duration.ofSeconds(2))
-                        .filter(throwable -> !(throwable instanceof WebClientResponseException.NotFound))
+                        // Only retry on server errors (5xx), not on connection errors
+                        .filter(throwable -> {
+                            if (throwable instanceof WebClientResponseException) {
+                                WebClientResponseException ex = (WebClientResponseException) throwable;
+                                return ex.getStatusCode().is5xxServerError();
+                            }
+                            // Don't retry on connection refused or timeout - service is down
+                            return false;
+                        })
                         .doBeforeRetry(retrySignal -> 
                             log.debug("Retrying config service call, attempt: {}", retrySignal.totalRetries() + 1)))
-                .doOnError(WebClientResponseException.class, e -> {
-                    log.debug("Config service returned error status: {} - {}", 
-                            e.getStatusCode(), e.getResponseBodyAsString());
+                .onErrorResume(WebClientResponseException.class, e -> {
+                    log.debug("Config service error: {} - Returning empty routes", e.getStatusCode());
+                    return Flux.empty();
                 })
-                .doOnError(TimeoutException.class, e -> {
-                    log.debug("Config service request timeout (may be starting up or slow)");
+                .onErrorResume(TimeoutException.class, e -> {
+                    log.debug("Config service timeout - Returning empty routes");
+                    return Flux.empty();
                 })
-                .doOnError(WebClientRequestException.class, e -> {
+                .onErrorResume(WebClientRequestException.class, e -> {
                     if (e.getCause() instanceof ConnectException) {
-                        log.debug("Config service not reachable (connection refused)");
+                        log.debug("Config service unavailable (connection refused) - Returning empty routes");
                     } else {
-                        log.debug("Config service request error: {}", e.getMessage());
+                        log.debug("Config service error: {} - Returning empty routes", e.getMessage());
                     }
-                })
-                .doOnError(e -> {
-                    // Log unexpected errors at debug level to avoid noise
-                    if (!(e instanceof WebClientResponseException) && 
-                        !(e instanceof TimeoutException) &&
-                        !(e instanceof WebClientRequestException)) {
-                        log.debug("Error fetching routes: {} - {}", e.getClass().getSimpleName(), e.getMessage());
-                    }
+                    return Flux.empty();
                 })
                 .onErrorResume(e -> {
-                    // Graceful degradation - return empty route list
-                    // This allows gateway to start without config service
+                    // Catch all other errors and return empty (graceful degradation)
+                    log.debug("Config service call failed - Returning empty routes");
                     return Flux.empty();
                 });
     }

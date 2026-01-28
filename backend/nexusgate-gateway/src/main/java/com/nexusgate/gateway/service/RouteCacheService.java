@@ -30,6 +30,7 @@ public class RouteCacheService {
     
     private volatile boolean cacheInitialized = false;
     private volatile long lastSuccessfulRefresh = 0;
+    private volatile boolean configServiceAvailable = true;
 
     /**
      * Initialize cache on startup
@@ -45,38 +46,44 @@ public class RouteCacheService {
      */
     @Scheduled(fixedDelay = 30000, initialDelay = 5000)
     public void refreshRoutes() {
-        log.debug("Refreshing route cache...");
         
         serviceRouteClient.getAllActiveRoutes()
                 .collectList()
                 .subscribe(
                         routes -> {
                             boolean wasEmpty = cachedRoutes.isEmpty();
+                            boolean wasUnavailable = !configServiceAvailable;
+                            
                             cachedRoutes.clear();
                             cachedRoutes.addAll(routes);
                             cacheInitialized = true;
                             lastSuccessfulRefresh = System.currentTimeMillis();
+                            configServiceAvailable = !routes.isEmpty();
                             
                             if (routes.isEmpty() && !wasEmpty) {
-                                log.warn("Route cache cleared - no active routes available");
-                            } else if (routes.isEmpty()) {
-                                log.debug("Route cache refresh: 0 routes (config service may be unavailable)");
-                            } else {
-                                log.info("✓ Route cache refreshed: {} active routes loaded", routes.size());
-                                // Log route details for debugging
+                                log.warn("⚠️ Route cache cleared - no active routes available");
+                            } else if (routes.isEmpty() && !wasUnavailable) {
+                                log.warn("⚠️ Config service unavailable - Gateway will return 404 for all requests");
+                            } else if (!routes.isEmpty() && wasUnavailable) {
+                                log.info("✓ Config service recovered! Loaded {} active routes", routes.size());
                                 routes.forEach(route -> 
                                     log.debug("  → Route: {} → {}", route.getPublicPath(), route.getTargetUrl())
                                 );
+                            } else if (!routes.isEmpty()) {
+                                log.info("✓ Route cache refreshed: {} active routes", routes.size());
                             }
                         },
                         error -> {
                             if (!cacheInitialized) {
-                                log.debug("Initial cache load failed (config service unavailable)");
+                                log.warn("⚠️ Initial cache load failed - Config service unavailable");
                                 cachedRoutes.clear();
-                                cacheInitialized = true; // Mark as initialized even if empty
-                            } else {
-                                log.debug("Cache refresh failed, keeping {} existing routes", cachedRoutes.size());
+                                cacheInitialized = true;
+                                configServiceAvailable = false;
+                            } else if (configServiceAvailable) {
+                                log.warn("⚠️ Config service became unavailable - Keeping {} existing routes", cachedRoutes.size());
+                                configServiceAvailable = false;
                             }
+                            // Silent after first failure - no need to spam logs every 30 seconds
                         }
                 );
     }

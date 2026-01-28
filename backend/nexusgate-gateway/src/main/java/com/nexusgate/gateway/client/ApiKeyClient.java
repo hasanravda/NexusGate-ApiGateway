@@ -40,19 +40,21 @@ public class ApiKeyClient {
                 .doOnSuccess(response -> log.debug("API key validation successful for key: {}...", 
                         keyValue != null && keyValue.length() > 4 ? keyValue.substring(0, 4) : "null"))
                 .onErrorResume(TimeoutException.class, e -> {
-                    log.debug("Config service timeout during API key validation");
+                    log.warn("Config service timeout - API key validation failed");
                     return Mono.error(new RuntimeException("Config service timeout"));
                 })
                 .onErrorResume(WebClientResponseException.class, e -> {
-                    log.debug("Config service error during API key validation: {}", e.getStatusCode());
-                    return Mono.error(new RuntimeException("Config service error: " + e.getStatusCode()));
+                    if (e.getStatusCode().is5xxServerError()) {
+                        log.warn("Config service error: {} - API key validation failed", e.getStatusCode());
+                    }
+                    return Mono.error(new RuntimeException("Config service error"));
                 })
                 .onErrorResume(e -> {
                     if (e instanceof ApiKeyInvalidException) {
                         return Mono.error(e);
                     }
-                    log.debug("Config service unavailable for API key validation");
-                    return Mono.error(new RuntimeException("Config service unavailable: " + e.getMessage()));
+                    log.warn("Config service unavailable - API key validation failed");
+                    return Mono.error(new RuntimeException("Config service unavailable"));
                 });
     }
 
@@ -67,9 +69,8 @@ public class ApiKeyClient {
                 .bodyToFlux(ApiKeyResponse.class)
                 .timeout(Duration.ofSeconds(10))
                 .doOnNext(apiKey -> log.debug("Fetched API key from config service: id={}", apiKey.getId()))
-                .doOnError(e -> log.debug("Config service unavailable for API key fetch"))
                 .onErrorResume(e -> {
-                    log.debug("Returning empty API key list (config service unavailable)");
+                    // Silent fallback - cache will remain empty
                     return Flux.empty();
                 });
     }
