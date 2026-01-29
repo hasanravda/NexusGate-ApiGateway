@@ -10,7 +10,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 @Configuration
 public class GatewayConfig {
 
-    @Value("${config.service.url:http://localhost:8082}")
+    @Value("${config.service.url}")
     private String configServiceUrl;
 
     @Bean
