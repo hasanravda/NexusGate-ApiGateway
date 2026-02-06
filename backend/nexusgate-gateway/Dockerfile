@@ -31,8 +31,8 @@ USER spring:spring
 # Set working directory
 WORKDIR /app
 
-# Copy jar from builder
-COPY --from=builder /app/target/*.jar app.jar
+# Copy jar from builder (ONLY gateway)
+COPY --from=builder /app/target/nexusgate-gateway-*.jar app.jar
 
 # Expose port
 EXPOSE 8081
