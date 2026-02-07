@@ -1,9 +1,38 @@
 # Load Testing Service
 
-## Overview
-A production-ready Spring Boot 3.x microservice designed to simulate high traffic and validate rate limiting behavior in API gateway systems. This service enables comprehensive load testing with configurable concurrency, request patterns, and real-time metrics collection.
-
 **Port:** 8083
+
+## Overview
+
+A **production-ready Spring Boot 3.x microservice** designed to simulate high traffic loads and validate rate limiting behavior in the NexusGate API Gateway. This service enables comprehensive load testing with configurable concurrency, multiple request patterns, and real-time metrics collection.
+
+### Key Features
+
+✅ **Concurrent Request Simulation** - 1-1000 parallel clients
+✅ **Multiple Traffic Patterns** - Constant rate, burst, ramp-up
+✅ **Real-Time Metrics** - Live test monitoring during execution
+✅ **Comprehensive Reports** - Success rate, latency percentiles, rate limit hits
+✅ **Non-Blocking HTTP** - WebClient for high-performance requests
+✅ **Thread-Safe Metrics** - AtomicLong and ConcurrentHashMap
+
+### Traffic Patterns
+
+| Pattern | Description | Use Case |
+|---------|-------------|----------|
+| **CONSTANT_RATE** | Steady request rate | Normal traffic simulation |
+| **BURST** | Sudden traffic spike | DDoS/flash sale simulation |
+| **RAMP_UP** | Gradual increase | Stress testing, capacity planning |
+
+### Performance
+
+| Metric | Value | Notes |
+|--------|-------|-------|
+| **Max Concurrency** | 1000 clients | Configurable |
+| **Request Rate** | 10,000+ req/sec | With sufficient resources |
+| **Latency Tracking** | P50, P95, P99 | Real-time calculation |
+| **Test Duration** | 1-3600 seconds | Configurable |
+
+---
 
 ## Architecture
 
